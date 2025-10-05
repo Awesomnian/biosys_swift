@@ -30,6 +30,8 @@ export default function MonitorScreen() {
   });
   const [deviceId, setDeviceId] = useState<string>('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const sensorServiceRef = useRef<SensorService | null>(null);
   const locationServiceRef = useRef<LocationService>(new LocationService());
@@ -37,6 +39,15 @@ export default function MonitorScreen() {
   useEffect(() => {
     initializeSensor();
   }, []);
+
+  useEffect(() => {
+    if (stats.isRunning && isStarting) {
+      setIsStarting(false);
+    }
+    if (!stats.isRunning && isStopping) {
+      setIsStopping(false);
+    }
+  }, [stats.isRunning]);
 
   const initializeSensor = async () => {
     try {
@@ -78,12 +89,19 @@ export default function MonitorScreen() {
     if (!sensorServiceRef.current) return;
 
     if (stats.isRunning) {
-      sensorServiceRef.current.stop();
+      setIsStopping(true);
+      try {
+        sensorServiceRef.current.stop();
+      } finally {
+        setIsStopping(false);
+      }
     } else {
+      setIsStarting(true);
       try {
         await sensorServiceRef.current.start();
       } catch (error) {
         alert('Failed to start audio capture. Please grant microphone permissions.');
+        setIsStarting(false);
       }
     }
   };
@@ -102,9 +120,19 @@ export default function MonitorScreen() {
 
       <View style={styles.statusCard}>
         <View style={styles.statusHeader}>
-          <Radio color={stats.isRunning ? '#10b981' : '#6b7280'} size={24} />
+          <Radio
+            color={
+              isStarting ? '#f59e0b' :
+              stats.isRunning ? '#ef4444' :
+              '#6b7280'
+            }
+            size={24}
+          />
           <Text style={styles.statusText}>
-            {stats.isRunning ? 'Monitoring Active' : 'Monitoring Stopped'}
+            {isStarting ? 'Initiating...' :
+             isStopping ? 'Stopping...' :
+             stats.isRunning ? 'Monitoring Active' :
+             'Monitoring Stopped'}
           </Text>
         </View>
         {deviceId && (
@@ -124,11 +152,23 @@ export default function MonitorScreen() {
         <TouchableOpacity
           style={[
             styles.mainButton,
-            stats.isRunning ? styles.stopButton : styles.startButton,
+            isStarting ? styles.initiatingButton :
+            stats.isRunning ? styles.activeButton :
+            styles.startButton,
           ]}
           onPress={handleStartStop}
-          disabled={!isInitialized}>
-          {stats.isRunning ? (
+          disabled={!isInitialized || isStarting || isStopping}>
+          {isStarting ? (
+            <>
+              <Radio color="#fff" size={24} />
+              <Text style={styles.buttonText}>Initiating...</Text>
+            </>
+          ) : isStopping ? (
+            <>
+              <Pause color="#fff" size={24} />
+              <Text style={styles.buttonText}>Stopping...</Text>
+            </>
+          ) : stats.isRunning ? (
             <>
               <Pause color="#fff" size={24} />
               <Text style={styles.buttonText}>Stop Monitoring</Text>
@@ -254,7 +294,10 @@ const styles = StyleSheet.create({
   startButton: {
     backgroundColor: '#10b981',
   },
-  stopButton: {
+  initiatingButton: {
+    backgroundColor: '#f59e0b',
+  },
+  activeButton: {
     backgroundColor: '#ef4444',
   },
   buttonText: {
