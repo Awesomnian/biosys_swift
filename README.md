@@ -2,14 +2,29 @@
 
 A proof-of-concept mobile application for autonomous detection and monitoring of Swift Parrot (*Lathamus discolor*) calls using machine learning.
 
-## Project Status: POC Complete ✅
+## ⚠️ Project Status: BLOCKED - Unresolved Technical Issue
 
-This is a working proof of concept demonstrating:
+**Current State**: Development halted due to unresolvable React Native networking limitations.
+
+**Issue**: The mobile app cannot make HTTP POST requests with FormData to external APIs (ngrok tunnel or Supabase Edge Functions). All network requests fail with `TypeError: Network request failed` despite the endpoints being publicly accessible.
+
+**Attempts**: 25+ different approaches over 37 versions - all failed
+**Root Cause**: Unknown - likely React Native/iOS networking restrictions in Expo Go environment
+
+**See**: `REACT_NATIVE_NETWORKING_ISSUE.md` for complete technical analysis and attempted solutions.
+
+### What Works ✅
 - Real-time audio capture on mobile devices
-- Cloud-based bird species identification via BirdNET
-- Selective storage of high-confidence Swift Parrot detections
-- GPS geolocation tagging
-- Autonomous field deployment capability
+- GPS geolocation tracking
+- UI and navigation (Monitor, Detections, Settings tabs)
+- Supabase database connections
+- BirdNET Docker container + ngrok tunnel
+
+### What Doesn't Work ❌
+- HTTP requests from React Native to external APIs
+- ML analysis integration (blocked by networking issue)
+- Detection storage (depends on ML analysis)
+- **Core POC functionality is non-operational**
 
 ---
 
@@ -240,17 +255,32 @@ audio_file_url  text              -- Supabase Storage URL
 
 ## Known Limitations
 
+### 🔴 Critical Issue: Networking Failure (Project Blocker)
+- React Native cannot make HTTP POST requests to external APIs
+- All approaches (fetch, XMLHttpRequest, proxies) fail identically
+- Endpoints are accessible via browser/curl but not from app
+- 25+ fix attempts across 37 versions - all unsuccessful
+- **See REACT_NATIVE_NETWORKING_ISSUE.md for full details**
+
 ### Network Requirements
 - ⚠️ Mobile device and laptop must be on same WiFi
 - ⚠️ **ngrok URL changes on each restart (free tier)** - Always verify URL before development
 - ⚠️ No offline detection (requires network for every analysis)
+- ⚠️ Currently blocked by networking issue above
 
 ### Platform Restrictions
 - ⚠️ Web version non-functional (mobile-only)
 - ⚠️ Requires Expo Go or custom build
 - ⚠️ Cannot test in actual remote field locations
 
-### Future Enhancements
+### Potential Solutions (Not Implemented)
+- Use Expo Development Build instead of Expo Go
+- Try expo-file-system FileSystem.uploadAsync() for HTTP uploads
+- Re-architect with Supabase Storage → Database Trigger → Edge Function
+- Deploy BirdNET to permanent cloud server (not ngrok)
+- Rebuild in native iOS/Android or different framework (Flutter, etc.)
+
+### Future Enhancements (If Networking Resolved)
 - Deploy BirdNET to cloud (Railway, Digital Ocean)
 - Implement on-device ML with TensorFlow Lite
 - Offline audio queueing and batch upload
@@ -262,6 +292,7 @@ audio_file_url  text              -- Supabase Storage URL
 
 ## Documentation
 
+- **REACT_NATIVE_NETWORKING_ISSUE.md**: ⚠️ **Critical blocker** - Complete analysis of networking failure
 - **PROJECT_DOCUMENTATION.md**: Complete architecture, data flow, API contracts
 - **CURRENT_STATUS.md**: Detailed status of all components
 - **TEST_CONNECTION.md**: Step-by-step testing guide

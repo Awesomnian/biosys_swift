@@ -251,15 +251,58 @@ Create a mobile bioacoustic monitoring application that autonomously detects Swi
 
 ## Known Issues & Limitations
 
+### 🔴 CRITICAL: React Native Networking Failure (PROJECT BLOCKER)
+
+**Status**: UNRESOLVED - Project cannot proceed to testing phase
+
+**Issue**: React Native app cannot make HTTP POST requests with FormData to external APIs (ngrok or Supabase Edge Functions). All requests fail with `TypeError: Network request failed` despite the endpoints being publicly accessible and working via curl/browser.
+
+**Impact**:
+- Cannot send audio to BirdNET for analysis
+- Core POC functionality is non-operational
+- 25+ fix attempts over 37 versions failed
+- No detections can be saved to database
+
+**Evidence**:
+- ngrok URL works in mobile browser: ✅
+- ngrok URL works via curl: ✅
+- Supabase Edge Function deployed: ✅
+- React Native fetch() to same URLs: ❌
+- React Native XMLHttpRequest: ❌
+- Server logs show NO requests received from app
+
+**Attempted Solutions (All Failed)**:
+1. Direct fetch() to ngrok with various headers
+2. XMLHttpRequest wrapper approach
+3. Supabase Edge Function as proxy
+4. Multiple header configurations
+5. Different FormData field names
+6. Both with and without Content-Type headers
+
+**Root Cause**: Unknown - likely React Native/iOS networking restrictions in Expo Go environment
+
+**See**: `REACT_NATIVE_NETWORKING_ISSUE.md` for complete technical analysis
+
+**Viable Solutions (Not Implemented)**:
+1. Use Expo Development Build instead of Expo Go
+2. Try expo-file-system FileSystem.uploadAsync() instead of fetch()
+3. Re-architect using Supabase Storage → Database Trigger → Edge Function
+4. Deploy to real cloud server (not ngrok) with permanent HTTPS
+5. Rebuild project in native iOS/Android or different framework
+
+---
+
 ### 1. ngrok URL Changes
 - **Issue**: Free ngrok URLs change on restart
 - **Impact**: Must update `.env` and restart app
 - **Workaround**: Use ngrok paid plan or deploy to cloud
+- **Note**: Currently blocked by networking issue above
 
 ### 2. Same Network Requirement
 - **Issue**: Mobile must be on same WiFi as laptop
 - **Impact**: Cannot test in actual field deployment
 - **Solution**: Deploy BirdNET to cloud service
+- **Note**: Currently blocked by networking issue above
 
 ### 3. Web Preview Limited
 - **Issue**: Web version shows "Mobile Only" messages
