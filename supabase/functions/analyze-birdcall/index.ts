@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const birdnetUrl = Deno.env.get("BIRDNET_SERVER_URL") || "http://localhost:8080";
+    const birdnetUrl = Deno.env.get("BIRDNET_SERVER_URL") || "https://pruinose-alise-uncooled.ngrok-free.dev";
     console.log(`Using BirdNET server at: ${birdnetUrl}`);
 
     if (req.method !== "POST") {
@@ -95,7 +95,6 @@ Deno.serve(async (req: Request) => {
     const birdnetData: BirdNETResponse = await birdnetResponse.json();
     console.log(`BirdNET returned ${birdnetData.predictions.length} time segments`);
 
-    // Flatten all species detections across time segments
     const allDetections: DetectionResult[] = [];
     for (const segment of birdnetData.predictions) {
       for (const speciesDetection of segment.species) {
