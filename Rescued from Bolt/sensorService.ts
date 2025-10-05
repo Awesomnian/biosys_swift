@@ -211,9 +211,8 @@ export class SensorService {
     }
 
     try {
-      // Send audio file URI to BirdNET API for analysis
-      // FileSystem.uploadAsync() requires file URI, not blob
-      const result = await this.detectionModel.analyzeAudio(segment.uri);
+      // Send audio blob to BirdNET API for analysis
+      const result = await this.detectionModel.analyzeAudio(segment.blob);
 
       // Success! Reset error counters
       this.consecutiveErrors = 0;
@@ -294,13 +293,9 @@ export class SensorService {
       confidence: result.confidence,
     };
 
-    // Save audio file (via URI) and metadata to Supabase
+    // Save audio blob and metadata to Supabase
     // If network unavailable, queues for later upload
-    // Note: storageService will need to handle URI instead of blob
-    // For now, we'll read the file and convert to blob for storage
-    const response = await fetch(segment.uri);
-    const blob = await response.blob();
-    await this.storageService.saveDetection(blob, metadata);
+    await this.storageService.saveDetection(segment.blob, metadata);
     this.updateStats();
   }
 

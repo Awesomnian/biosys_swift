@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "BioSys: Swift",
+    "slug": "biosys-swift",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/biosys_swift_logo.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/biosys_swift_logo.png"
+    },
+    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

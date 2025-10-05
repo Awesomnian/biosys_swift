@@ -1,22 +1,12 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 
-/**
- * Audio segment captured from microphone
- * Changed from blob to uri for FileSystem.uploadAsync() compatibility
- */
 export interface AudioSegment {
-  uri: string;  // Changed from blob: Blob - now returns file URI for direct upload
+  blob: Blob;
   timestamp: Date;
   duration: number;
 }
 
-/**
- * Audio Capture Service
- * 
- * Continuously records 5-second audio segments in WAV format for BirdNET analysis.
- * Uses WAV format (BirdNET's preferred format) instead of .m4a for better compatibility.
- */
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
   private isRecording = false;
@@ -64,8 +54,6 @@ export class AudioCaptureService {
     try {
       const segmentStartTime = Date.now();
 
-      // Record audio in M4A format - more reliable on Android
-      // BirdNET can process M4A/AAC files
       const { recording } = await Audio.Recording.createAsync({
         android: {
           extension: '.m4a',
@@ -105,18 +93,16 @@ export class AudioCaptureService {
             if (uri) {
               const fileInfo = await FileSystem.getInfoAsync(uri);
               if (fileInfo.exists) {
+                const blob = await this.uriToBlob(uri);
                 const duration = Date.now() - segmentStartTime;
 
-                // Pass file URI directly - no blob conversion needed
-                // FileSystem.uploadAsync() works with file URIs
                 this.onSegmentReady({
-                  uri,
+                  blob,
                   timestamp: new Date(segmentStartTime),
                   duration,
                 });
 
-                // Note: File will be deleted by detection service after upload
-                // Don't delete here to ensure FileSystem.uploadAsync() can access it
+                await FileSystem.deleteAsync(uri, { idempotent: true });
               }
             }
 
@@ -136,6 +122,11 @@ export class AudioCaptureService {
       console.error('Failed to start new segment:', error);
       throw error;
     }
+  }
+
+  private async uriToBlob(uri: string): Promise<Blob> {
+    const response = await fetch(uri);
+    return await response.blob();
   }
 
   async stop(): Promise<void> {

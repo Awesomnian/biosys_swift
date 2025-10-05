@@ -11,14 +11,53 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "usesCleartextTraffic": true,
+      "package": "com.biosys.swift",
+      "permissions": [
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
     "web": {
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/images/biosys_swift_logo.png"
     },
-    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow BioSys Swift to record audio for Swift Parrot detection."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow BioSys Swift to access your location to geotag Swift Parrot detections."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fdc8fc92-a6bf-48a2-bcb6-5d41e8ee737c"
+      }
     }
   }
 }
