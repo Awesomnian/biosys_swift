@@ -1,3 +1,6 @@
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+
 export interface AudioSegment {
   blob: Blob;
   timestamp: Date;
@@ -5,11 +8,11 @@ export interface AudioSegment {
 }
 
 export class AudioCaptureService {
-  private mediaRecorder: MediaRecorder | null = null;
-  private audioStream: MediaStream | null = null;
+  private recording: Audio.Recording | null = null;
   private isRecording = false;
   private segmentDuration: number;
   private onSegmentReady: (segment: AudioSegment) => void;
+  private recordingTimer: NodeJS.Timeout | null = null;
 
   constructor(
     segmentDuration: number = 5000,
@@ -25,78 +28,125 @@ export class AudioCaptureService {
     }
 
     try {
-      this.audioStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Microphone permission not granted');
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
       });
-
-      this.mediaRecorder = new MediaRecorder(this.audioStream, {
-        mimeType: 'audio/webm',
-      });
-
-      const audioChunks: Blob[] = [];
-      const segmentStartTime = Date.now();
-
-      this.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
-
-      this.mediaRecorder.onstop = () => {
-        if (audioChunks.length > 0) {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const duration = Date.now() - segmentStartTime;
-
-          this.onSegmentReady({
-            blob: audioBlob,
-            timestamp: new Date(segmentStartTime),
-            duration,
-          });
-
-          audioChunks.length = 0;
-        }
-
-        if (this.isRecording) {
-          this.startNewSegment();
-        }
-      };
 
       this.isRecording = true;
-      this.startNewSegment();
+      await this.startNewSegment();
     } catch (error) {
       console.error('Failed to start audio capture:', error);
       throw error;
     }
   }
 
-  private startNewSegment(): void {
-    if (this.mediaRecorder && this.isRecording) {
-      this.mediaRecorder.start();
-      setTimeout(() => {
-        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-          this.mediaRecorder.stop();
+  private async startNewSegment(): Promise<void> {
+    if (!this.isRecording) {
+      return;
+    }
+
+    try {
+      const segmentStartTime = Date.now();
+
+      this.recording = new Audio.Recording();
+      await this.recording.prepareToRecordAsync({
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.m4a',
+          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      });
+
+      await this.recording.startAsync();
+
+      this.recordingTimer = setTimeout(async () => {
+        if (this.recording && this.isRecording) {
+          try {
+            await this.recording.stopAndUnloadAsync();
+            const uri = this.recording.getURI();
+
+            if (uri) {
+              const fileInfo = await FileSystem.getInfoAsync(uri);
+              if (fileInfo.exists) {
+                const blob = await this.uriToBlob(uri);
+                const duration = Date.now() - segmentStartTime;
+
+                this.onSegmentReady({
+                  blob,
+                  timestamp: new Date(segmentStartTime),
+                  duration,
+                });
+
+                await FileSystem.deleteAsync(uri, { idempotent: true });
+              }
+            }
+
+            this.recording = null;
+
+            if (this.isRecording) {
+              await this.startNewSegment();
+            }
+          } catch (error) {
+            console.error('Error stopping segment:', error);
+            this.recording = null;
+          }
         }
       }, this.segmentDuration);
+    } catch (error) {
+      console.error('Failed to start new segment:', error);
+      throw error;
     }
   }
 
-  stop(): void {
+  private async uriToBlob(uri: string): Promise<Blob> {
+    const response = await fetch(uri);
+    return await response.blob();
+  }
+
+  async stop(): Promise<void> {
     this.isRecording = false;
 
-    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
+    if (this.recordingTimer) {
+      clearTimeout(this.recordingTimer);
+      this.recordingTimer = null;
     }
 
-    if (this.audioStream) {
-      this.audioStream.getTracks().forEach((track) => track.stop());
-      this.audioStream = null;
+    if (this.recording) {
+      try {
+        await this.recording.stopAndUnloadAsync();
+        const uri = this.recording.getURI();
+        if (uri) {
+          await FileSystem.deleteAsync(uri, { idempotent: true });
+        }
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+      }
+      this.recording = null;
     }
-
-    this.mediaRecorder = null;
   }
 
   isActive(): boolean {
