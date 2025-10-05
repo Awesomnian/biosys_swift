@@ -1,11 +1,8 @@
 import { AudioCaptureService, AudioSegment } from './audioCapture';
 import { DetectionResult } from './detectionModel';
-import { SwiftParrotDetectionModel as MockModel } from './detectionModel';
-import { SwiftParrotDetectionModel as TensorFlowModel } from './detectionModelTensorFlow';
-import { BirdNETDetectionModel } from './detectionModelBirdNET';
 import { ModelFactory } from './modelFactory';
 import { StorageService } from './storageService';
-import { LocationService, LocationData } from './locationService';
+import { LocationService } from './locationService';
 import { Detection } from '../lib/supabase';
 
 export interface SensorConfig {
@@ -27,7 +24,7 @@ export interface SensorStats {
 
 export class SensorService {
   private audioCapture: AudioCaptureService;
-  private detectionModel: MockModel | TensorFlowModel | BirdNETDetectionModel | null = null;
+  private detectionModel: any = null;
   private storageService: StorageService;
   private locationService: LocationService;
   private config: SensorConfig;

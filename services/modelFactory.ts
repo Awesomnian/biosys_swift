@@ -1,13 +1,4 @@
-import 'react-native-url-polyfill/auto';
 import { SwiftParrotDetectionModel as MockModel } from './detectionModel';
-import {
-  SwiftParrotDetectionModel as TensorFlowModel,
-  ModelConfig,
-} from './detectionModelTensorFlow';
-import {
-  BirdNETDetectionModel,
-  BirdNETConfig,
-} from './detectionModelBirdNET';
 
 export type ModelType = 'mock' | 'tensorflow' | 'birdnet';
 
@@ -20,9 +11,7 @@ export interface ModelFactoryConfig {
 }
 
 export class ModelFactory {
-  static async createModel(
-    config: ModelFactoryConfig
-  ): Promise<MockModel | TensorFlowModel | BirdNETDetectionModel> {
+  static async createModel(config: ModelFactoryConfig): Promise<any> {
     const threshold = config.threshold || 0.9;
 
     if (config.type === 'mock') {
@@ -38,7 +27,9 @@ export class ModelFactory {
       }
 
       console.log('Creating TensorFlow detection model');
-      const tfConfig: ModelConfig = {
+      const { SwiftParrotDetectionModel: TensorFlowModel } = await import('./detectionModelTensorFlow');
+
+      const tfConfig = {
         modelPath: config.modelPath,
         threshold,
       };
@@ -50,7 +41,9 @@ export class ModelFactory {
 
     if (config.type === 'birdnet') {
       console.log('Creating BirdNET detection model');
-      const birdnetConfig: BirdNETConfig = {
+      const { BirdNETDetectionModel } = await import('./detectionModelBirdNET');
+
+      const birdnetConfig = {
         threshold,
         supabaseUrl: config.supabaseUrl,
         supabaseAnonKey: config.supabaseAnonKey,
@@ -64,9 +57,7 @@ export class ModelFactory {
     throw new Error(`Unknown model type: ${config.type}`);
   }
 
-  static async autoDetectAndCreate(
-    threshold: number = 0.9
-  ): Promise<MockModel | TensorFlowModel | BirdNETDetectionModel> {
+  static async autoDetectAndCreate(threshold: number = 0.9): Promise<any> {
     console.log('Using BirdNET model as default');
     return await ModelFactory.createModel({
       type: 'birdnet',
@@ -74,13 +65,11 @@ export class ModelFactory {
     });
   }
 
-  static async createBirdNETModel(
-    threshold: number = 0.9
-  ): Promise<BirdNETDetectionModel> {
+  static async createBirdNETModel(threshold: number = 0.9): Promise<any> {
     console.log('Creating BirdNET model');
     return await ModelFactory.createModel({
       type: 'birdnet',
       threshold,
-    }) as BirdNETDetectionModel;
+    });
   }
 }
