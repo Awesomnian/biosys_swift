@@ -67,25 +67,9 @@ export class ModelFactory {
   static async autoDetectAndCreate(
     threshold: number = 0.9
   ): Promise<MockModel | TensorFlowModel | BirdNETDetectionModel> {
-    const defaultModelPath = '/models/swift-parrot/model.json';
-
-    try {
-      const response = await fetch(defaultModelPath, { method: 'HEAD' });
-
-      if (response.ok) {
-        console.log('TensorFlow model detected, using production model');
-        return await ModelFactory.createModel({
-          type: 'tensorflow',
-          modelPath: defaultModelPath,
-          threshold,
-        });
-      }
-    } catch (error) {
-      console.log('TensorFlow model not found, using mock model');
-    }
-
+    console.log('Using BirdNET model as default');
     return await ModelFactory.createModel({
-      type: 'mock',
+      type: 'birdnet',
       threshold,
     });
   }

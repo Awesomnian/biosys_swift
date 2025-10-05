@@ -5,6 +5,7 @@ import { SwiftParrotDetectionModel as TensorFlowModel } from './detectionModelTe
 import { BirdNETDetectionModel } from './detectionModelBirdNET';
 import { ModelFactory } from './modelFactory';
 import { StorageService } from './storageService';
+import { LocationService, LocationData } from './locationService';
 import { Detection } from '../lib/supabase';
 
 export interface SensorConfig {
@@ -28,6 +29,7 @@ export class SensorService {
   private audioCapture: AudioCaptureService;
   private detectionModel: MockModel | TensorFlowModel | BirdNETDetectionModel | null = null;
   private storageService: StorageService;
+  private locationService: LocationService;
   private config: SensorConfig;
   private stats: SensorStats;
   private onStatsUpdate?: (stats: SensorStats) => void;
@@ -49,6 +51,7 @@ export class SensorService {
     );
 
     this.storageService = new StorageService();
+    this.locationService = new LocationService();
   }
 
   async initialize(): Promise<void> {
@@ -56,6 +59,7 @@ export class SensorService {
       this.config.detectionThreshold
     );
     await this.storageService.initialize();
+    await this.locationService.requestPermission();
     this.updateStats();
   }
 
@@ -64,6 +68,7 @@ export class SensorService {
       return;
     }
 
+    await this.locationService.startTracking();
     await this.audioCapture.start();
     this.stats.isRunning = true;
     this.updateStats();
@@ -104,11 +109,13 @@ export class SensorService {
     this.stats.totalDetections++;
     this.stats.lastDetection = segment.timestamp;
 
+    const location = await this.locationService.getCurrentLocation();
+
     const metadata: Omit<Detection, 'id' | 'audio_file_url'> = {
       device_id: this.config.deviceId,
       timestamp: segment.timestamp.toISOString(),
-      latitude: this.config.latitude,
-      longitude: this.config.longitude,
+      latitude: location?.latitude || this.config.latitude,
+      longitude: location?.longitude || this.config.longitude,
       model_name: result.modelName,
       confidence: result.confidence,
     };

@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Upload, Radio } from 'lucide-react-native';
+import { Play, Pause, Upload, Radio, MapPin } from 'lucide-react-native';
 import { SensorService, SensorStats } from '../../services/sensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LocationService } from '../../services/locationService';
 
 export default function MonitorScreen() {
   const [stats, setStats] = useState<SensorStats>({
@@ -13,7 +14,9 @@ export default function MonitorScreen() {
   });
   const [deviceId, setDeviceId] = useState<string>('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const sensorServiceRef = useRef<SensorService | null>(null);
+  const locationServiceRef = useRef<LocationService>(new LocationService());
 
   useEffect(() => {
     initializeSensor();
@@ -28,8 +31,12 @@ export default function MonitorScreen() {
       }
       setDeviceId(id);
 
-      const latitude = await AsyncStorage.getItem('latitude');
-      const longitude = await AsyncStorage.getItem('longitude');
+      await locationServiceRef.current.requestPermission();
+      const location = await locationServiceRef.current.getCurrentLocation();
+      if (location) {
+        setCurrentLocation({ latitude: location.latitude, longitude: location.longitude });
+      }
+
       const threshold = await AsyncStorage.getItem('threshold');
 
       const sensor = new SensorService(
@@ -37,8 +44,8 @@ export default function MonitorScreen() {
           deviceId: id,
           segmentDuration: 5000,
           detectionThreshold: threshold ? parseFloat(threshold) : 0.9,
-          latitude: latitude ? parseFloat(latitude) : undefined,
-          longitude: longitude ? parseFloat(longitude) : undefined,
+          latitude: location?.latitude,
+          longitude: location?.longitude,
         },
         setStats
       );
@@ -86,6 +93,14 @@ export default function MonitorScreen() {
         </View>
         {deviceId && (
           <Text style={styles.deviceId}>Device: {deviceId}</Text>
+        )}
+        {currentLocation && (
+          <View style={styles.locationInfo}>
+            <MapPin size={14} color="#6b7280" />
+            <Text style={styles.locationText}>
+              {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
+            </Text>
+          </View>
         )}
       </View>
 
@@ -196,6 +211,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 8,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#6b7280',
   },
   controlCard: {
     margin: 16,
