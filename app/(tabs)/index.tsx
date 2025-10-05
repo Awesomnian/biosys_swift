@@ -1,11 +1,27 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Upload, Radio, MapPin } from 'lucide-react-native';
+import { Play, Pause, Upload, Radio, MapPin, Smartphone } from 'lucide-react-native';
 import { SensorService, SensorStats } from '../../services/sensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationService } from '../../services/locationService';
 
 export default function MonitorScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        <View style={styles.webContent}>
+          <Smartphone size={64} color="#10b981" />
+          <Text style={styles.webTitle}>Mobile App Only</Text>
+          <Text style={styles.webText}>
+            BioSys: Swift is a mobile bioacoustic monitoring app that requires native device features like microphone access and GPS.
+          </Text>
+          <Text style={styles.webText}>
+            Please scan the QR code with your mobile device to use this app.
+          </Text>
+        </View>
+      </View>
+    );
+  }
   const [stats, setStats] = useState<SensorStats>({
     isRunning: false,
     totalSegmentsProcessed: 0,
@@ -306,5 +322,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  webContainer: {
+    flex: 1,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  webContent: {
+    maxWidth: 500,
+    alignItems: 'center',
+    gap: 20,
+  },
+  webTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  webText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
