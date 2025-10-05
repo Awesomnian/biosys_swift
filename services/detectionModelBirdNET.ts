@@ -35,7 +35,7 @@ export class BirdNETDetectionModel {
 
     if (birdnetServerUrl) {
       this.useDirectServer = true;
-      this.edgeFunctionUrl = `${birdnetServerUrl}/api/v1/analyze`;
+      this.edgeFunctionUrl = `${birdnetServerUrl}/inference/`;
       this.anonKey = '';
       console.log('Using direct BirdNET server:', this.edgeFunctionUrl);
     } else {

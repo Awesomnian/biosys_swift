@@ -46,7 +46,26 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const birdnetUrl = Deno.env.get("BIRDNET_SERVER_URL") || "https://pruinose-alise-uncooled.ngrok-free.dev";
+    const birdnetUrl = Deno.env.get("BIRDNET_SERVER_URL");
+
+    if (!birdnetUrl) {
+      return new Response(
+        JSON.stringify({
+          error: "BIRDNET_SERVER_URL environment variable not set",
+          confidence: 0,
+          isPositive: false,
+          modelName: "BirdNET"
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     console.log(`Using BirdNET server at: ${birdnetUrl}`);
 
     if (req.method !== "POST") {
