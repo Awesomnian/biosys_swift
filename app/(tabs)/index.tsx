@@ -31,6 +31,13 @@ export default function MonitorScreen() {
       }
       setDeviceId(id);
 
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (error) {
+        console.error('Microphone permission denied:', error);
+        alert('Microphone access is required for audio detection. Please grant permission in settings.');
+      }
+
       await locationServiceRef.current.requestPermission();
       const location = await locationServiceRef.current.getCurrentLocation();
       if (location) {
