@@ -195,6 +195,7 @@ export class BirdNETDetectionModel {
       console.log('Sending audio to BirdNET server...');
       console.log('URL:', this.edgeFunctionUrl);
       console.log('Blob size:', audioBlob.size, 'bytes');
+      console.log('Blob type:', audioBlob.type);
 
       // Set up headers
       const headers: Record<string, string> = {
@@ -204,6 +205,9 @@ export class BirdNETDetectionModel {
       if (!this.useDirectServer && this.anonKey) {
         headers['Authorization'] = `Bearer ${this.anonKey}`;
       }
+
+      console.log('Headers:', JSON.stringify(headers));
+      console.log('Making POST request...');
 
       // Send POST request to BirdNET API
       const response = await fetch(this.edgeFunctionUrl, {
