@@ -12,7 +12,7 @@ export class AudioCaptureService {
   private isRecording = false;
   private segmentDuration: number;
   private onSegmentReady: (segment: AudioSegment) => void;
-  private recordingTimer: NodeJS.Timeout | null = null;
+  private recordingTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     segmentDuration: number = 5000,
