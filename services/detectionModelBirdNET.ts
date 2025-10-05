@@ -190,12 +190,24 @@ export class BirdNETDetectionModel {
       // Prepare multipart form data
       // CRITICAL: Field name MUST be "file" (not "audio") for BirdNET API
       const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.webm');
+
+      // Determine file extension from blob type
+      let filename = 'audio.wav'; // Default to WAV for PCM
+      if (audioBlob.type.includes('webm')) {
+        filename = 'audio.webm';
+      } else if (audioBlob.type.includes('mp4') || audioBlob.type.includes('m4a')) {
+        filename = 'audio.m4a';
+      } else if (audioBlob.type.includes('wav')) {
+        filename = 'audio.wav';
+      }
+
+      formData.append('file', audioBlob, filename);
 
       console.log('Sending audio to BirdNET server...');
       console.log('URL:', this.edgeFunctionUrl);
       console.log('Blob size:', audioBlob.size, 'bytes');
       console.log('Blob type:', audioBlob.type);
+      console.log('Filename:', filename);
 
       // Set up headers
       const headers: Record<string, string> = {
@@ -253,8 +265,9 @@ export class BirdNETDetectionModel {
       // Check for HTTP errors
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Server error response:', errorText);
         throw new Error(
-          `BirdNET edge function returned ${response.status}: ${errorText}`
+          `BirdNET server returned ${response.status}: ${errorText}`
         );
       }
 
