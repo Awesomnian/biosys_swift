@@ -119,36 +119,21 @@ export class BirdNETDetectionModel {
   constructor(config: BirdNETConfig) {
     this.threshold = config.threshold;
 
-    // Try to use direct BirdNET server (Docker/ngrok/cloud deployment)
-    // FALLBACK: Hardcoded ngrok URL (system keeps resetting .env file)
-    const birdnetServerUrl =
-      config.birdnetServerUrl ||
-      process.env.EXPO_PUBLIC_BIRDNET_SERVER_URL ||
-      'https://pruinose-alise-uncooled.ngrok-free.dev';
+    // ALWAYS use Supabase Edge Function (proxies to ngrok internally)
+    // This avoids React Native FormData issues
+    const supabaseUrl =
+      config.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey =
+      config.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (birdnetServerUrl) {
-      // MODE 1: Direct BirdNET Server (CURRENT POC SETUP)
-      this.useDirectServer = true;
-      this.edgeFunctionUrl = `${birdnetServerUrl}/inference/`;
-      this.anonKey = '';
-      console.log('Using direct BirdNET server:', this.edgeFunctionUrl);
-    } else {
-      // MODE 2: Supabase Edge Function (NOT CURRENTLY USED)
-      const supabaseUrl =
-        config.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey =
-        config.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error(
-          'Either BIRDNET_SERVER_URL or Supabase URL and Anon Key are required'
-        );
-      }
-
-      this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
-      this.anonKey = supabaseAnonKey;
-      console.log('Using Supabase Edge Function:', this.edgeFunctionUrl);
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase URL and Anon Key are required');
     }
+
+    this.useDirectServer = false;
+    this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
+    this.anonKey = supabaseAnonKey;
+    console.log('Using Supabase Edge Function:', this.edgeFunctionUrl);
   }
 
   /**
@@ -187,8 +172,7 @@ export class BirdNETDetectionModel {
     const startTime = Date.now();
 
     try {
-      // Prepare multipart form data
-      // CRITICAL: Field name MUST be "file" (not "audio") for BirdNET API
+      // Prepare multipart form data for Supabase Edge Function
       const formData = new FormData();
 
       // Determine file extension from blob type
@@ -201,9 +185,10 @@ export class BirdNETDetectionModel {
         filename = 'audio.wav';
       }
 
-      formData.append('file', audioBlob, filename);
+      // Edge function expects field name "audio"
+      formData.append('audio', audioBlob, filename);
 
-      console.log('Sending audio to BirdNET server...');
+      console.log('Sending audio to Supabase Edge Function...');
       console.log('URL:', this.edgeFunctionUrl);
       console.log('Blob size:', audioBlob.size, 'bytes');
       console.log('Blob type:', audioBlob.type);
@@ -211,53 +196,17 @@ export class BirdNETDetectionModel {
 
       // Set up headers
       const headers: Record<string, string> = {
-        'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
+        'Authorization': `Bearer ${this.anonKey}`,
+        'apikey': this.anonKey,
       };
 
-      if (!this.useDirectServer && this.anonKey) {
-        headers['Authorization'] = `Bearer ${this.anonKey}`;
-      }
+      console.log('Making POST request with fetch...');
 
-      console.log('Headers:', JSON.stringify(headers));
-      console.log('Making POST request...');
-
-      // WORKAROUND: Use XMLHttpRequest instead of fetch for React Native compatibility
-      const response = await new Promise<Response>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-
-        xhr.onload = () => {
-          const responseHeaders = new Headers();
-          const headerPairs = xhr.getAllResponseHeaders().trim().split('\r\n');
-          headerPairs.forEach(line => {
-            const parts = line.split(': ');
-            if (parts.length === 2) {
-              responseHeaders.set(parts[0], parts[1]);
-            }
-          });
-
-          resolve({
-            ok: xhr.status >= 200 && xhr.status < 300,
-            status: xhr.status,
-            statusText: xhr.statusText,
-            headers: responseHeaders,
-            text: async () => xhr.responseText,
-            json: async () => JSON.parse(xhr.responseText),
-          } as Response);
-        };
-
-        xhr.onerror = () => {
-          console.error('XHR Error:', xhr.status, xhr.statusText);
-          reject(new Error(`Network request failed: ${xhr.statusText || 'Unknown error'}`));
-        };
-
-        xhr.open('POST', this.edgeFunctionUrl);
-
-        // Set headers
-        Object.entries(headers).forEach(([key, value]) => {
-          xhr.setRequestHeader(key, value);
-        });
-
-        xhr.send(formData as any);
+      // Use standard fetch - Supabase client handles it properly
+      const response = await fetch(this.edgeFunctionUrl, {
+        method: 'POST',
+        headers,
+        body: formData,
       });
 
       console.log('Response status:', response.status, response.statusText);
@@ -276,75 +225,34 @@ export class BirdNETDetectionModel {
 
       const inferenceTime = Date.now() - startTime;
 
-      // Process predictions to find Swift Parrot
-      let maxConfidence = 0; // Highest confidence across all species
-      let swiftParrotConfidence = 0; // Highest Swift Parrot confidence
-      let detectedSpecies = ''; // Top detected species name
-      const allDetections: Array<{
-        species: string;
-        common_name: string;
-        scientific_name: string;
-        confidence: number;
-      }> = [];
+      console.log('Edge function response:', JSON.stringify(result));
 
-      // BirdNET returns predictions array with time segments
-      if (result.predictions && result.predictions.length > 0) {
-        for (const segment of result.predictions) {
-          for (const species of segment.species) {
-            const speciesName = species.species_name || '';
-            const confidence = species.probability || 0;
-
-            // Store all detections for debugging/analysis
-            allDetections.push({
-              species: speciesName,
-              common_name: speciesName.split('_')[0] || speciesName,
-              scientific_name: speciesName,
-              confidence: confidence,
-            });
-
-            // Track highest confidence species overall
-            if (confidence > maxConfidence) {
-              maxConfidence = confidence;
-              detectedSpecies = speciesName;
-            }
-
-            // Check if this is a Swift Parrot detection
-            // Species names from BirdNET typically: "Lathamus discolor_Swift Parrot"
-            if (
-              speciesName.toLowerCase().includes('swift') ||
-              speciesName.toLowerCase().includes('lathamus')
-            ) {
-              swiftParrotConfidence = Math.max(swiftParrotConfidence, confidence);
-            }
-          }
-        }
+      // Edge function already processes and returns simplified format
+      // {confidence, isPositive, modelName, species, allDetections}
+      if (result.error) {
+        throw new Error(`Edge function error: ${result.error}`);
       }
 
-      // Determine final confidence and detection status
-      // If Swift Parrot detected, use that confidence; otherwise use max
-      const finalConfidence = swiftParrotConfidence > 0 ? swiftParrotConfidence : maxConfidence;
-      const isSwiftParrot = swiftParrotConfidence >= this.threshold;
+      const allDetections = result.allDetections?.map((d: any) => ({
+        species: d.species_name,
+        common_name: d.species_name.split('_')[1] || d.species_name,
+        scientific_name: d.species_name.split('_')[0] || d.species_name,
+        confidence: d.probability,
+      })) || [];
 
-      // Log analysis results
       console.log(
-        `BirdNET analysis completed in ${inferenceTime}ms, top confidence: ${maxConfidence.toFixed(3)}, swift parrot: ${swiftParrotConfidence.toFixed(3)}`
+        `BirdNET analysis completed in ${inferenceTime}ms, confidence: ${result.confidence.toFixed(3)}, positive: ${result.isPositive}`
       );
-
-      if (isSwiftParrot) {
-        console.log(
-          `Swift Parrot detected! Confidence: ${swiftParrotConfidence.toFixed(3)}`
-        );
-      }
 
       // Return structured detection result
       return {
-        confidence: finalConfidence,
-        modelName: 'BirdNET',
-        isPositive: isSwiftParrot, // Only true if Swift Parrot AND confidence ≥ threshold
-        species: detectedSpecies,
-        commonName: detectedSpecies.split('_')[0] || detectedSpecies,
-        scientificName: detectedSpecies,
-        allDetections: allDetections,
+        confidence: result.confidence,
+        modelName: result.modelName,
+        isPositive: result.isPositive,
+        species: result.species,
+        commonName: result.species?.split('_')[1] || result.species,
+        scientificName: result.species?.split('_')[0] || result.species,
+        allDetections,
       };
     } catch (error) {
       console.error('BirdNET analysis failed:', error);
