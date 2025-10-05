@@ -189,7 +189,9 @@ export class BirdNETDetectionModel {
       const formData = new FormData();
       formData.append('file', audioBlob, 'audio.webm');
 
-      console.log('Sending audio to BirdNET edge function...');
+      console.log('Sending audio to BirdNET server...');
+      console.log('URL:', this.edgeFunctionUrl);
+      console.log('Blob size:', audioBlob.size, 'bytes');
 
       // Set up headers (auth only needed for Supabase edge function)
       const headers: Record<string, string> = {};
@@ -204,6 +206,8 @@ export class BirdNETDetectionModel {
         headers,
         body: formData,
       });
+
+      console.log('Response status:', response.status, response.statusText);
 
       // Check for HTTP errors
       if (!response.ok) {
@@ -290,6 +294,15 @@ export class BirdNETDetectionModel {
       };
     } catch (error) {
       console.error('BirdNET analysis failed:', error);
+
+      // Provide more helpful error messages
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        throw new Error(
+          `Cannot reach BirdNET server at ${this.edgeFunctionUrl}. ` +
+          `Check: (1) ngrok is running, (2) URL in .env is correct, (3) phone has internet`
+        );
+      }
+
       throw new Error(`BirdNET analysis failed: ${error}`);
     }
   }
