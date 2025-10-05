@@ -36,12 +36,13 @@
 
 ### Network Requirements
 - ⚠️ **Mobile device and laptop must be on same WiFi network**
-- ⚠️ ngrok free tier URL changes on each restart
+- ⚠️ **ngrok free tier URL changes on EVERY restart** - ALWAYS verify before development
 - ⚠️ No offline detection capability (requires network for every analysis)
 
 ### Configuration Dependencies
-- ⚠️ `.env` file must be manually updated with ngrok URL
-- ⚠️ App must be fully restarted after `.env` changes
+- ⚠️ **`.env` file must be manually updated with ngrok URL each time ngrok restarts**
+- ⚠️ **CRITICAL**: Check ngrok console URL and update `.env` BEFORE starting app
+- ⚠️ App must be fully restarted (force quit) after `.env` changes
 - ⚠️ Supabase credentials hardcoded in `.env`
 
 ### Platform Restrictions

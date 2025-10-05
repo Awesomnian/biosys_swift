@@ -49,6 +49,11 @@ This is a working proof of concept demonstrating:
    EXPO_PUBLIC_BIRDNET_SERVER_URL=https://xxx.ngrok-free.dev
    ```
 
+   **⚠️ CRITICAL**: The ngrok URL changes EVERY TIME ngrok restarts (free tier). Before starting development, ALWAYS:
+   - Check your ngrok console for the current URL
+   - Update `EXPO_PUBLIC_BIRDNET_SERVER_URL` in `.env`
+   - Force quit and restart your mobile app
+
 5. **Start Development Server**
    ```bash
    npm run dev
@@ -237,7 +242,7 @@ audio_file_url  text              -- Supabase Storage URL
 
 ### Network Requirements
 - ⚠️ Mobile device and laptop must be on same WiFi
-- ⚠️ ngrok URL changes on each restart (free tier)
+- ⚠️ **ngrok URL changes on each restart (free tier)** - Always verify URL before development
 - ⚠️ No offline detection (requires network for every analysis)
 
 ### Platform Restrictions
