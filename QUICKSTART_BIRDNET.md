@@ -36,24 +36,40 @@ Open PowerShell (Windows) or Terminal (Mac/Linux):
 # Pull the Docker image
 docker pull benjaminloeffel/birdnet-inference-api
 
-# Run the server
-docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+# Run the server (container uses port 80, we map to 8080 on host)
+docker run -p 8080:80 benjaminloeffel/birdnet-inference-api
 ```
 
 You should see:
 ```
-Server listening on http://0.0.0.0:8080
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:80 (Press CTRL+C to quit)
 ```
+
+**Note:** TensorFlow warnings about gradients are normal and can be ignored. They only affect training, not inference.
 
 ### Step 3: Test It Works
 
 Open a new terminal/PowerShell window:
 
+**Windows PowerShell:**
+```powershell
+# Use curl.exe (not PowerShell's curl alias)
+curl.exe http://localhost:8080/health
+
+# Or use Invoke-WebRequest
+Invoke-WebRequest -Uri http://localhost:8080/health
+
+# Or open in browser
+start http://localhost:8080/health
+```
+
+**Mac/Linux:**
 ```bash
 curl http://localhost:8080/health
 ```
 
-If you see a response, it's working! ✅
+If you see a response (JSON or page loads), it's working! ✅
 
 ### Step 4: Update Your App Code
 
@@ -99,7 +115,7 @@ The BirdNET server will keep running in Docker. To stop it:
 
 To start it again:
 ```bash
-docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+docker run -p 8080:80 benjaminloeffel/birdnet-inference-api
 ```
 
 ---
@@ -114,9 +130,21 @@ docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
 **Error:** `port is already allocated`
 **Fix:** Change to different port:
 ```bash
-docker run -p 8081:8080 benjaminloeffel/birdnet-inference-api
+docker run -p 8081:80 benjaminloeffel/birdnet-inference-api
 ```
 Then update your edge function to use port 8081.
+
+### PowerShell curl error
+**Error:** `The underlying connection was closed`
+**Fix:** Use `curl.exe` instead of `curl`:
+```powershell
+curl.exe http://localhost:8080/health
+```
+PowerShell's `curl` is an alias that behaves differently.
+
+### TensorFlow warnings
+**Warning:** `WARNING:absl:Importing a function...with unsaved custom gradients`
+**Fix:** These are normal and safe to ignore. They don't affect the server.
 
 ### Can't access localhost:8080
 **Error:** Edge function can't reach BirdNET

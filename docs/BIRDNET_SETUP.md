@@ -9,7 +9,7 @@
 **Run BirdNET server locally (easiest):**
 ```bash
 docker pull benjaminloeffel/birdnet-inference-api
-docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+docker run -p 8080:80 benjaminloeffel/birdnet-inference-api
 ```
 
 **Test it works:**
@@ -60,7 +60,7 @@ Your App (Detection Results)
 docker pull benjaminloeffel/birdnet-inference-api
 
 # Run on port 8080
-docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+docker run -p 8080:80 benjaminloeffel/birdnet-inference-api
 ```
 
 **Option B: Using pip**
@@ -85,10 +85,10 @@ python -m birdnet_analyzer.analyze --help
 
 ```bash
 # Run community BirdNET API
-docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+docker run -p 8080:80 benjaminloeffel/birdnet-inference-api
 
 # Or use BirdNET-Go (alternative implementation with built-in API)
-docker run -p 8080:8080 ghcr.io/tphakala/birdnet-go:latest
+docker run -p 8080:80 ghcr.io/tphakala/birdnet-go:latest
 ```
 
 **🐍 Python Method (May not have server mode yet):**
@@ -197,7 +197,7 @@ apt install docker.io
 
 # Pull and run BirdNET container
 docker pull benjaminloeffel/birdnet-inference-api
-docker run -d -p 8080:8080 --restart=always \
+docker run -d -p 8080:80 --restart=always \
   --name birdnet benjaminloeffel/birdnet-inference-api
 
 # Check status
@@ -243,7 +243,7 @@ BirdNET-Go is a Go implementation with excellent performance:
 # https://github.com/tphakala/birdnet-go/releases
 
 # Run with Docker
-docker run -d -p 8080:8080 --restart=always \
+docker run -d -p 8080:80 --restart=always \
   ghcr.io/tphakala/birdnet-go:latest
 ```
 
@@ -306,7 +306,7 @@ CMD ["python", "server.py", "--host", "0.0.0.0", "--port", "8080"]
 Build and deploy:
 ```bash
 docker build -t birdnet .
-docker run -p 8080:8080 birdnet
+docker run -p 8080:80 birdnet
 ```
 
 Deploy to Fly.io, Google Cloud Run, AWS ECS, etc.
