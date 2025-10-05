@@ -120,8 +120,11 @@ export class BirdNETDetectionModel {
     this.threshold = config.threshold;
 
     // Try to use direct BirdNET server (Docker/ngrok/cloud deployment)
+    // FALLBACK: Hardcoded ngrok URL (system keeps resetting .env file)
     const birdnetServerUrl =
-      config.birdnetServerUrl || process.env.EXPO_PUBLIC_BIRDNET_SERVER_URL;
+      config.birdnetServerUrl ||
+      process.env.EXPO_PUBLIC_BIRDNET_SERVER_URL ||
+      'https://pruinose-alise-uncooled.ngrok-free.dev';
 
     if (birdnetServerUrl) {
       // MODE 1: Direct BirdNET Server (CURRENT POC SETUP)
