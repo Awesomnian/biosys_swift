@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import * as tf from '@tensorflow/tfjs';
 import { AudioPreprocessor, DEFAULT_SPECTROGRAM_CONFIG } from './audioPreprocessing';
 

@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import { SwiftParrotDetectionModel as MockModel } from './detectionModel';
 import {
   SwiftParrotDetectionModel as TensorFlowModel,
