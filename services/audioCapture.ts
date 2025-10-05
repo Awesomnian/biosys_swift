@@ -54,8 +54,7 @@ export class AudioCaptureService {
     try {
       const segmentStartTime = Date.now();
 
-      this.recording = new Audio.Recording();
-      await this.recording.prepareToRecordAsync({
+      const { recording } = await Audio.Recording.createAsync({
         android: {
           extension: '.m4a',
           outputFormat: Audio.AndroidOutputFormat.MPEG_4,
@@ -81,13 +80,15 @@ export class AudioCaptureService {
         },
       });
 
-      await this.recording.startAsync();
+      this.recording = recording;
 
       this.recordingTimer = setTimeout(async () => {
-        if (this.recording && this.isRecording) {
+        const currentRecording = this.recording;
+        if (currentRecording && this.isRecording) {
           try {
-            await this.recording.stopAndUnloadAsync();
-            const uri = this.recording.getURI();
+            const uri = currentRecording.getURI();
+            await currentRecording.stopAndUnloadAsync();
+            this.recording = null;
 
             if (uri) {
               const fileInfo = await FileSystem.getInfoAsync(uri);
@@ -105,14 +106,15 @@ export class AudioCaptureService {
               }
             }
 
-            this.recording = null;
-
             if (this.isRecording) {
               await this.startNewSegment();
             }
           } catch (error) {
             console.error('Error stopping segment:', error);
             this.recording = null;
+            if (this.isRecording) {
+              await this.startNewSegment();
+            }
           }
         }
       }, this.segmentDuration);
@@ -137,8 +139,8 @@ export class AudioCaptureService {
 
     if (this.recording) {
       try {
-        await this.recording.stopAndUnloadAsync();
         const uri = this.recording.getURI();
+        await this.recording.stopAndUnloadAsync();
         if (uri) {
           await FileSystem.deleteAsync(uri, { idempotent: true });
         }
