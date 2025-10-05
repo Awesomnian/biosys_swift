@@ -1,186 +1,332 @@
-# BioSys: Swift - Swift Parrot Bioacoustic Sensor
+# BioSys: Swift - Swift Parrot Bioacoustic Monitoring App
 
-**Version 1.0 - Proof of Concept**
+A proof-of-concept mobile application for autonomous detection and monitoring of Swift Parrot (*Lathamus discolor*) calls using machine learning.
 
-A web-based prototype demonstrating bioacoustic monitoring for detecting endangered Swift Parrot (*Lathamus discolor*) calls using on-device AI analysis.
+## Project Status: POC Complete ✅
 
-*Part of the BioSys series of bioinformatics applications.*
+This is a working proof of concept demonstrating:
+- Real-time audio capture on mobile devices
+- Cloud-based bird species identification via BirdNET
+- Selective storage of high-confidence Swift Parrot detections
+- GPS geolocation tagging
+- Autonomous field deployment capability
 
-## Overview
+---
 
-This proof-of-concept application demonstrates the core functionality of a bioacoustic sensor system:
-
-- **Continuous audio capture** from the device microphone
-- **On-device AI detection** using a mock TensorFlow model
-- **Local data persistence** with automatic cloud synchronization
-- **Real-time monitoring** dashboard with detection history
-- **Offline-first architecture** for remote deployment scenarios
-
-## Important Limitations
-
-⚠️ **This is a web-based proof of concept**, not a production-ready sensor system.
-
-### Key Constraints
-
-1. **Web Platform Only**: This app runs in a web browser and cannot:
-   - Run as a background service when the browser is closed
-   - Auto-restart on device reboot
-   - Operate continuously for weeks/months unattended
-   - Optimize power consumption like native apps
-
-2. **Mock AI Model (Default)**: Uses a simulated detection model that generates random confidence scores
-   - Can be replaced with BirdNET (30 min setup) or custom TensorFlow.js model
-   - See [Detection Models](#detection-models) section below for options
-
-3. **Microphone Access**: Requires active browser window with granted permissions
-   - Audio capture stops when tab is inactive (browser limitation)
-   - Not suitable for true remote deployment
-
-## For Production Deployment
-
-To build a real bioacoustic sensor, you need:
-
-- **Native Android Application** (Kotlin/Java)
-- **Android Background Services** for continuous operation
-- **TensorFlow Lite** for efficient on-device inference
-- **WorkManager** for robust background tasks
-- **Power optimization** strategies for extended battery life
-
-## Features Implemented
-
-### ✅ Core Functionality
-
-- Audio capture in 5-second segments
-- Mock AI analysis with configurable confidence threshold
-- Detection metadata logging (timestamp, GPS, confidence)
-- Local storage with upload queue
-- Automatic sync when online
-- Detection history viewer
-
-### ✅ User Interface
-
-- **Monitor Tab**: Real-time status, statistics, and controls
-- **Detections Tab**: History of all positive detections
-- **Settings Tab**: Configure device ID, location, and thresholds
-
-### ✅ Backend Integration
-
-- Supabase database for detection metadata
-- Supabase Storage for audio files
-- Row Level Security policies configured
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
-
 - Node.js 18+ and npm
-- Supabase project with environment variables configured
+- Docker Desktop
+- ngrok (free account)
+- Expo Go app on mobile device
+- Mobile device and laptop on same WiFi network
 
-### Installation
+### Setup (5 minutes)
 
-```bash
-npm install
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Start BirdNET Server**
+   ```bash
+   docker run -d -p 8080:80 benjaminloeffel/birdnet-inference-api
+   ```
+
+3. **Start ngrok Tunnel**
+   ```bash
+   ngrok http 8080
+   ```
+   Copy the HTTPS URL (e.g., `https://xxx.ngrok-free.dev`)
+
+4. **Configure Environment**
+
+   Update `.env` with your ngrok URL:
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=https://0ec90b57d6e95fcbda19832f.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=[already set]
+   EXPO_PUBLIC_BIRDNET_SERVER_URL=https://xxx.ngrok-free.dev
+   ```
+
+5. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Test on Mobile**
+   - Open Expo Go
+   - Scan QR code
+   - Grant microphone and location permissions
+   - Tap "Start Monitoring"
+
+---
+
+## How It Works
+
+```
+┌─────────────────┐
+│  Mobile Device  │ Captures 5-second audio segments
+└────────┬────────┘
+         │
+         ▼ POST /inference/
+┌─────────────────┐
+│  ngrok Tunnel   │ Forwards to localhost:8080
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Docker BirdNET  │ Analyzes with ML model
+└────────┬────────┘
+         │
+         ▼ Returns predictions
+┌─────────────────┐
+│  Mobile Device  │ If Swift Parrot + confidence ≥ 90%:
+│                 │ - Get GPS coordinates
+│                 │ - Save audio to Supabase Storage
+│                 │ - Save metadata to database
+└─────────────────┘
 ```
 
-### Configuration
+### Detection Logic
+1. Every 5 seconds: capture audio segment
+2. Send to BirdNET for species identification
+3. Check all predictions for "swift" or "lathamus" in species name
+4. If Swift Parrot confidence ≥ threshold (default 90%):
+   - Save audio file + metadata to Supabase
+   - Display in Detections tab
+5. Otherwise: discard audio (save bandwidth/storage)
 
-Ensure your `.env` file contains:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-```
-
-### Running the App
-
-```bash
-npm run dev
-```
-
-Then open the app in your browser and:
-
-1. Grant microphone permissions when prompted
-2. Configure location in Settings tab (optional)
-3. Adjust detection threshold (default: 0.9)
-4. Start monitoring from the Monitor tab
+---
 
 ## Architecture
 
-### Services
+### Mobile App (React Native/Expo)
+- **Monitor Screen**: Start/stop monitoring, view statistics
+- **Detections Screen**: Browse detected Swift Parrot calls
+- **Settings Screen**: Configure threshold, location, sync
 
-- **AudioCaptureService**: Manages microphone access and segmentation
-- **SwiftParrotDetectionModel**: Mock AI model for call detection
-- **StorageService**: Handles local persistence and upload queue
-- **SensorService**: Coordinates all components
+### Services Layer
+- **SensorService**: Main orchestration (coordinates all components)
+- **AudioCaptureService**: Continuous 5-second audio recording
+- **BirdNETDetectionModel**: API interface to BirdNET
+- **StorageService**: Supabase integration for data persistence
+- **LocationService**: GPS tracking and coordinates
 
-### Data Flow
+### Backend
+- **BirdNET Docker**: ML model for bird species identification
+- **ngrok**: Exposes localhost to mobile device
+- **Supabase**: Database and file storage
+
+---
+
+## Project Structure
 
 ```
-Microphone → Audio Segments → AI Model → Detection?
-                                            ↓ Yes
-                                    Save Locally
-                                            ↓
-                                    Upload Queue
-                                            ↓
-                                    Supabase (when online)
+biosys-swift/
+├── app/
+│   ├── (tabs)/          # Tab navigation screens
+│   │   ├── index.tsx    # Monitor screen
+│   │   ├── detections.tsx  # Detection history
+│   │   └── settings.tsx    # Configuration
+│   └── _layout.tsx      # Root layout
+│
+├── services/
+│   ├── sensorService.ts          # Main orchestration ✅
+│   ├── audioCapture.ts           # Audio recording ✅
+│   ├── detectionModelBirdNET.ts  # BirdNET API interface ✅
+│   ├── storageService.ts         # Supabase integration ✅
+│   ├── locationService.ts        # GPS tracking ✅
+│   └── modelFactory.ts           # Model selection ✅
+│
+├── supabase/
+│   ├── migrations/      # Database schema
+│   └── functions/       # Edge functions (not currently used)
+│
+├── .env                 # Environment configuration
+├── PROJECT_DOCUMENTATION.md  # Complete architecture guide
+├── CURRENT_STATUS.md    # What works/doesn't work
+└── TEST_CONNECTION.md   # Testing guide
 ```
 
-### Database Schema
+---
 
-**detections** table:
-- device_id, timestamp, latitude, longitude
-- model_name, confidence
-- audio_file_url (Supabase Storage)
+## Configuration
 
-**sensor_status** table:
-- device_id, last_seen, battery_level
-- storage_used_mb, total_detections, status
+### Environment Variables (`.env`)
 
-## Detection Models
+```bash
+# Supabase (database and storage)
+EXPO_PUBLIC_SUPABASE_URL=https://0ec90b57d6e95fcbda19832f.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=[your key]
 
-The app now supports **three detection models**:
+# BirdNET Server (REQUIRED - updates on each ngrok restart)
+EXPO_PUBLIC_BIRDNET_SERVER_URL=https://your-ngrok-url.ngrok-free.dev
+```
 
-| Model | Best For | Setup Time |
-|-------|----------|------------|
-| **Mock** | Testing UI | 0 min (default) |
-| **BirdNET** | Production use | 30 min |
-| **TensorFlow.js** | Custom training | 1-2 weeks |
+**IMPORTANT**: After updating `.env`, you MUST:
+1. Force quit the mobile app
+2. Reopen Expo Go
+3. Scan QR code again
 
-### Getting Started with Models
+### Detection Settings
 
-**⚡ Quick Start (5 minutes):**
-- 🐳 **[BirdNET Quick Start](QUICKSTART_BIRDNET.md)** - Run BirdNET with Docker NOW (updated 2025)
+- **Threshold**: 0.9 (90% confidence) - adjustable in Settings tab
+- **Segment Duration**: 5 seconds (fixed)
+- **Max Consecutive Errors**: 5 (then auto-stop)
+- **Error Cooldown**: 30 seconds between error messages
 
-**Complete Guides:**
-- 📖 **[Model Documentation](docs/README_MODELS.md)** - Complete guide to all models
-- 🚀 **[BirdNET Setup](docs/BIRDNET_SETUP.md)** - Full BirdNET deployment guide
-- 🔧 **[TensorFlow.js Setup](docs/TENSORFLOW_SETUP.md)** - Train your own model
-- 💡 **[Usage Examples](docs/USAGE_EXAMPLE.md)** - Code examples
+---
 
-**Recommended Path:**
-1. Start with **Mock Model** to test the UI (works now, no setup)
-2. Deploy **BirdNET** for real detection (5 min with Docker)
-3. Optional: Train **custom TensorFlow.js** model for offline use
+## Database Schema
 
-> **Note:** BirdNET installation changed in 2025. Old `requirements.txt` method doesn't exist anymore. Use Docker instead (see Quick Start above).
+### `detections` Table
+```sql
+id              uuid PRIMARY KEY
+device_id       text              -- Unique sensor identifier
+timestamp       timestamptz       -- When detection occurred
+latitude        float8            -- GPS latitude
+longitude       float8            -- GPS longitude
+confidence      float8            -- ML confidence (0.0-1.0)
+model_name      text              -- "BirdNET"
+audio_file_url  text              -- Supabase Storage URL
+```
 
-## Storage Bucket Setup
+### Storage Bucket
+- **Name**: `detections`
+- **Contents**: Audio files (.webm format)
+- **Security**: RLS enabled, authenticated access only
 
-The application requires a Supabase storage bucket named `audio-detections`. SQL setup scripts are provided in `scripts/setup-storage.sql`.
+---
 
-## Future Enhancements
+## Testing
 
-- Integration with real TensorFlow.js audio model
-- Audio visualization (waveform/spectrogram)
-- Export detection data as CSV
-- Multi-species detection support
-- Battery level monitoring
-- Network status indicators
+### Test BirdNET Connection
+1. Ensure Docker and ngrok are running
+2. Visit ngrok URL in mobile browser
+3. Should see BirdNET API documentation
 
-## Conservation Context
+### Test Detection
+1. Start monitoring in app
+2. Play Swift Parrot call from YouTube/Xeno-canto
+3. Watch for detection within 5-10 seconds
+4. Check Detections tab for saved result
 
-The Swift Parrot is critically endangered, with fewer than 2,000 individuals remaining. Bioacoustic monitoring provides non-invasive, continuous data collection to support conservation efforts in Tasmania's Tarkine/takayna forest.
+### Troubleshooting
+
+**"BirdNET server unreachable"**
+- Verify Docker is running: `docker ps`
+- Verify ngrok is running: check PowerShell/terminal
+- Verify mobile and laptop on same WiFi
+- Try accessing ngrok URL in mobile browser
+
+**"Monitoring stops automatically"**
+- Normal after 5 consecutive failures
+- Check error message for specific issue
+- Restart monitoring after fixing problem
+
+**"No detections appearing"**
+- Default threshold is 90% (very high)
+- Lower threshold in Settings tab
+- Try playing known Swift Parrot recording
+- Check Supabase database directly
+
+---
+
+## Known Limitations
+
+### Network Requirements
+- ⚠️ Mobile device and laptop must be on same WiFi
+- ⚠️ ngrok URL changes on each restart (free tier)
+- ⚠️ No offline detection (requires network for every analysis)
+
+### Platform Restrictions
+- ⚠️ Web version non-functional (mobile-only)
+- ⚠️ Requires Expo Go or custom build
+- ⚠️ Cannot test in actual remote field locations
+
+### Future Enhancements
+- Deploy BirdNET to cloud (Railway, Digital Ocean)
+- Implement on-device ML with TensorFlow Lite
+- Offline audio queueing and batch upload
+- Audio playback of detections
+- Species information and images
+- Data export (CSV, GeoJSON)
+
+---
+
+## Documentation
+
+- **PROJECT_DOCUMENTATION.md**: Complete architecture, data flow, API contracts
+- **CURRENT_STATUS.md**: Detailed status of all components
+- **TEST_CONNECTION.md**: Step-by-step testing guide
+
+---
+
+## Technology Stack
+
+- **Mobile Framework**: React Native + Expo
+- **Navigation**: Expo Router (file-based)
+- **ML Model**: BirdNET (neural network for bird identification)
+- **ML Infrastructure**: Docker container
+- **Network Tunnel**: ngrok
+- **Database**: Supabase (PostgreSQL)
+- **Storage**: Supabase Storage
+- **GPS**: Expo Location
+- **Audio**: Expo AV
+
+---
+
+## Development
+
+### Available Scripts
+
+```bash
+npm run dev          # Start Expo development server
+npm run build:web    # Build web version (limited functionality)
+npm run lint         # Run ESLint
+npm run typecheck    # TypeScript type checking
+```
+
+### Code Style
+- TypeScript throughout
+- Comprehensive JSDoc comments on all services
+- Functional React components with hooks
+- Error boundaries and recovery
+
+---
+
+## Contributing
+
+This is a proof of concept for research purposes. For production deployment:
+
+1. Deploy BirdNET to permanent cloud infrastructure
+2. Implement user authentication
+3. Add offline queueing
+4. Build standalone mobile apps
+5. Set up monitoring and analytics
+6. Implement on-device ML for offline operation
+
+---
 
 ## License
 
-Research prototype for conservation purposes.
+Research/Educational Use
+
+---
+
+## Support
+
+For questions about:
+- **BirdNET**: https://github.com/kahst/BirdNET-Analyzer
+- **Supabase**: https://supabase.io/docs
+- **Expo**: https://docs.expo.dev
+- **Swift Parrot**: https://www.birdlife.org.au/bird-profile/swift-parrot
+
+---
+
+## Acknowledgments
+
+- **BirdNET**: Cornell Lab of Ornithology & Chemnitz University of Technology
+- **Docker Image**: benjaminloeffel/birdnet-inference-api
+- **Species Focus**: Swift Parrot (*Lathamus discolor*) - Critically Endangered
