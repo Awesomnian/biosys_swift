@@ -196,8 +196,10 @@ export class BirdNETDetectionModel {
       console.log('URL:', this.edgeFunctionUrl);
       console.log('Blob size:', audioBlob.size, 'bytes');
 
-      // Set up headers (auth only needed for Supabase edge function)
-      const headers: Record<string, string> = {};
+      // Set up headers
+      const headers: Record<string, string> = {
+        'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
+      };
 
       if (!this.useDirectServer && this.anonKey) {
         headers['Authorization'] = `Bearer ${this.anonKey}`;
