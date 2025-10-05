@@ -1,6 +1,6 @@
 # Swift Parrot Detection Models - Complete Guide
 
-Welcome! This guide helps you get started with bird sound detection models for your Tarkine Ears app.
+Welcome! This guide helps you get started with bird sound detection models for your BioSys: Swift app.
 
 ## What's Available
 

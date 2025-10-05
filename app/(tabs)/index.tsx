@@ -73,7 +73,7 @@ export default function MonitorScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Tarkine Ears</Text>
+        <Text style={styles.title}>BioSys: Swift</Text>
         <Text style={styles.subtitle}>Swift Parrot Bioacoustic Sensor</Text>
       </View>
 

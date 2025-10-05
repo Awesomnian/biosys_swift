@@ -1,8 +1,10 @@
-# Tarkine Ears - Swift Parrot Bioacoustic Sensor
+# BioSys: Swift - Swift Parrot Bioacoustic Sensor
 
 **Version 1.0 - Proof of Concept**
 
 A web-based prototype demonstrating bioacoustic monitoring for detecting endangered Swift Parrot (*Lathamus discolor*) calls using on-device AI analysis.
+
+*Part of the BioSys series of bioinformatics applications.*
 
 ## Overview
 

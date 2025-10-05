@@ -177,7 +177,7 @@ export default function SettingsScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Tarkine Ears v1.0 - Proof of Concept
+          BioSys: Swift v1.0 - Proof of Concept
         </Text>
         <Text style={styles.footerSubtext}>
           For production deployment, use native Android app
