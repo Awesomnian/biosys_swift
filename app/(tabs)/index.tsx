@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Upload, Radio, MapPin, Smartphone, AlertCircle } from 'lucide-react-native';
+import { Play, Pause, Upload, Radio, MapPin, Smartphone, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { SensorService, SensorStats } from '../../services/sensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationService } from '../../services/locationService';
