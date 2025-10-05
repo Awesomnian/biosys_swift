@@ -3,19 +3,25 @@ import {
   SwiftParrotDetectionModel as TensorFlowModel,
   ModelConfig,
 } from './detectionModelTensorFlow';
+import {
+  BirdNETDetectionModel,
+  BirdNETConfig,
+} from './detectionModelBirdNET';
 
-export type ModelType = 'mock' | 'tensorflow';
+export type ModelType = 'mock' | 'tensorflow' | 'birdnet';
 
 export interface ModelFactoryConfig {
   type: ModelType;
   threshold?: number;
   modelPath?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 export class ModelFactory {
   static async createModel(
     config: ModelFactoryConfig
-  ): Promise<MockModel | TensorFlowModel> {
+  ): Promise<MockModel | TensorFlowModel | BirdNETDetectionModel> {
     const threshold = config.threshold || 0.9;
 
     if (config.type === 'mock') {
@@ -41,12 +47,25 @@ export class ModelFactory {
       return model;
     }
 
+    if (config.type === 'birdnet') {
+      console.log('Creating BirdNET detection model');
+      const birdnetConfig: BirdNETConfig = {
+        threshold,
+        supabaseUrl: config.supabaseUrl,
+        supabaseAnonKey: config.supabaseAnonKey,
+      };
+
+      const model = new BirdNETDetectionModel(birdnetConfig);
+      await model.initialize();
+      return model;
+    }
+
     throw new Error(`Unknown model type: ${config.type}`);
   }
 
   static async autoDetectAndCreate(
     threshold: number = 0.9
-  ): Promise<MockModel | TensorFlowModel> {
+  ): Promise<MockModel | TensorFlowModel | BirdNETDetectionModel> {
     const defaultModelPath = '/models/swift-parrot/model.json';
 
     try {
@@ -68,5 +87,15 @@ export class ModelFactory {
       type: 'mock',
       threshold,
     });
+  }
+
+  static async createBirdNETModel(
+    threshold: number = 0.9
+  ): Promise<BirdNETDetectionModel> {
+    console.log('Creating BirdNET model');
+    return await ModelFactory.createModel({
+      type: 'birdnet',
+      threshold,
+    }) as BirdNETDetectionModel;
   }
 }

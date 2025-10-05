@@ -40,11 +40,7 @@ export class AudioPreprocessor {
     for (let i = 0; i <= channelData.length - frameSize; i += hopSize) {
       const frame = Array.from(channelData.slice(i, i + frameSize));
 
-      const features = Meyda.extract('melBands', frame, {
-        melBands,
-        sampleRate,
-        bufferSize: frameSize,
-      }) as number[] | null;
+      const features = Meyda.extract('melBands', frame) as number[] | null;
 
       if (features) {
         spectrograms.push(features);

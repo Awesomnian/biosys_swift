@@ -2,6 +2,7 @@ import { AudioCaptureService, AudioSegment } from './audioCapture';
 import { DetectionResult } from './detectionModel';
 import { SwiftParrotDetectionModel as MockModel } from './detectionModel';
 import { SwiftParrotDetectionModel as TensorFlowModel } from './detectionModelTensorFlow';
+import { BirdNETDetectionModel } from './detectionModelBirdNET';
 import { ModelFactory } from './modelFactory';
 import { StorageService } from './storageService';
 import { Detection } from '../lib/supabase';
@@ -25,7 +26,7 @@ export interface SensorStats {
 
 export class SensorService {
   private audioCapture: AudioCaptureService;
-  private detectionModel: MockModel | TensorFlowModel | null = null;
+  private detectionModel: MockModel | TensorFlowModel | BirdNETDetectionModel | null = null;
   private storageService: StorageService;
   private config: SensorConfig;
   private stats: SensorStats;

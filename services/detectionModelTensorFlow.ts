@@ -64,7 +64,8 @@ export class SwiftParrotDetectionModel {
       const melSpectrogram = this.preprocessor.extractMelSpectrogram(audioBuffer);
 
       const inputShape = this.preprocessor.getInputShape();
-      const inputTensor = tf.tensor4d(melSpectrogram, inputShape);
+      const flatData = melSpectrogram[0].flat();
+      const inputTensor = tf.tensor4d(flatData, inputShape);
 
       const prediction = this.model.predict(inputTensor) as tf.Tensor;
       const predictionData = await prediction.data();

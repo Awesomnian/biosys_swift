@@ -26,9 +26,9 @@ This proof-of-concept application demonstrates the core functionality of a bioac
    - Operate continuously for weeks/months unattended
    - Optimize power consumption like native apps
 
-2. **Mock AI Model**: Uses a simulated detection model that generates random confidence scores
-   - Replace with real TensorFlow.js model for actual deployment
-   - Current model randomly triggers detections for demonstration purposes
+2. **Mock AI Model (Default)**: Uses a simulated detection model that generates random confidence scores
+   - Can be replaced with BirdNET (30 min setup) or custom TensorFlow.js model
+   - See [Detection Models](#detection-models) section below for options
 
 3. **Microphone Access**: Requires active browser window with granted permissions
    - Audio capture stops when tab is inactive (browser limitation)
@@ -134,31 +134,30 @@ Microphone → Audio Segments → AI Model → Detection?
 - device_id, last_seen, battery_level
 - storage_used_mb, total_detections, status
 
-## Integrating a Real AI Model
+## Detection Models
 
-To use an actual TensorFlow.js model:
+The app now supports **three detection models**:
 
-1. Train or obtain a TensorFlow model for Swift Parrot calls
-2. Convert to TensorFlow.js format
-3. Replace `services/detectionModel.ts`:
+| Model | Best For | Setup Time |
+|-------|----------|------------|
+| **Mock** | Testing UI | 0 min (default) |
+| **BirdNET** | Production use | 30 min |
+| **TensorFlow.js** | Custom training | 1-2 weeks |
 
-```typescript
-import * as tf from '@tensorflow/tfjs';
+### Getting Started with Models
 
-export class SwiftParrotDetectionModel {
-  private model: tf.LayersModel;
+**Quick Start:**
+- 📖 **[Model Documentation](docs/README_MODELS.md)** - Complete guide to all models
+- 🚀 **[BirdNET Setup](docs/BIRDNET_SETUP.md)** - Use pre-trained model (recommended)
+- 🔧 **[TensorFlow.js Setup](docs/TENSORFLOW_SETUP.md)** - Train your own model
+- 💡 **[Usage Examples](docs/USAGE_EXAMPLE.md)** - Code examples
 
-  async initialize() {
-    this.model = await tf.loadLayersModel('/path/to/model.json');
-  }
+**Recommended Path:**
+1. Start with **Mock Model** to test the UI
+2. Deploy **BirdNET** for real detection (30 min setup)
+3. Optional: Train **custom TensorFlow.js** model for offline use
 
-  async analyzeAudio(audioBlob: Blob) {
-    // Convert audio to mel-spectrogram
-    // Run inference
-    // Return confidence score
-  }
-}
-```
+See [docs/README_MODELS.md](docs/README_MODELS.md) for complete details.
 
 ## Storage Bucket Setup
 
