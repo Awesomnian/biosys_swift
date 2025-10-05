@@ -43,23 +43,60 @@ export class BirdNETDetectionModel {
   constructor(config: BirdNETConfig) {
     try {
       console.log('🔧 BirdNET Model constructor starting...');
+      console.log('  📋 Config received:', {
+        threshold: config.threshold,
+        hasSupabaseUrl: !!config.supabaseUrl,
+        hasSupabaseKey: !!config.supabaseAnonKey
+      });
+      
       this.threshold = config.threshold;
+      
       console.log('🔧 BirdNET Model initialized (Supabase Storage Proxy)');
       console.log('🎯 Detection threshold:', this.threshold);
     } catch (error) {
       console.error('❌ BirdNET constructor failed:', error);
-      throw error;
+      console.error('Error type:', typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      throw new Error(`BirdNET constructor failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async initialize(): Promise<void> {
     try {
       console.log('🔧 BirdNET model initializing...');
+      
+      // Check environment variables
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      
+      console.log('  🔍 Environment check:');
+      console.log('    Supabase URL present:', !!supabaseUrl);
+      console.log('    Supabase Key present:', !!supabaseKey);
+      
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Missing Supabase credentials in environment');
+      }
+      
+      // Test Supabase client import
+      console.log('  📦 Testing Supabase client import...');
+      try {
+        const { supabase } = await import('../lib/supabase');
+        console.log('  ✅ Supabase client imported successfully');
+      } catch (importError) {
+        console.error('  ❌ Supabase client import failed:', importError);
+        throw new Error(`Supabase client import failed: ${importError instanceof Error ? importError.message : String(importError)}`);
+      }
+      
       console.log('✅ BirdNET model ready (using Supabase Edge Function)');
       this.initialized = true;
     } catch (error) {
       console.error('❌ BirdNET initialize() failed:', error);
-      throw error;
+      console.error('Error details:', {
+        type: typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'No stack'
+      });
+      throw new Error(`BirdNET initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

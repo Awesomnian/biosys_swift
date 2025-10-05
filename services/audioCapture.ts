@@ -33,25 +33,56 @@ export class AudioCaptureService {
   }
 
   async start(): Promise<void> {
+    console.log('🎤 AudioCaptureService.start() CALLED');
+    console.log('  📊 Current isRecording:', this.isRecording);
+    
     if (this.isRecording) {
+      console.log('  ⚠️ Already recording, returning');
       return;
     }
 
     try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
+      console.log('  🔧 Step 1: Requesting microphone permission (5s timeout)...');
+      
+      const permissionPromise = Audio.requestPermissionsAsync();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Microphone permission timeout')), 5000)
+      );
+      
+      const permission = await Promise.race([permissionPromise, timeoutPromise]) as any;
+      
+      console.log('  📊 Permission result:', {
+        granted: permission?.granted,
+        canAskAgain: permission?.canAskAgain,
+        status: permission?.status
+      });
+      
+      if (!permission || !permission.granted) {
+        console.error('  ❌ Microphone permission DENIED or TIMEOUT');
         throw new Error('Microphone permission not granted');
       }
+      console.log('  ✅ Microphone permission granted');
 
+      console.log('  🔧 Step 2: Setting audio mode...');
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
+      console.log('  ✅ Audio mode set');
 
+      console.log('  🔧 Step 3: Setting isRecording = true...');
       this.isRecording = true;
+      console.log('  ✅ isRecording set');
+
+      console.log('  🔧 Step 4: Starting first audio segment...');
       await this.startNewSegment();
+      console.log('  ✅ First segment started');
+      
+      console.log('✅ AudioCaptureService.start() COMPLETE');
     } catch (error) {
-      console.error('Failed to start audio capture:', error);
+      console.error('❌ AudioCaptureService.start() FAILED:', error);
+      console.error('  Error type:', typeof error);
+      console.error('  Error message:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }

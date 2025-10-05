@@ -4,12 +4,12 @@
     "slug": "biosys-swift",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/biosys_swift_logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/biosys_swift_logo.png",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#111827"
     },
@@ -18,17 +18,16 @@
       "bundleIdentifier": "com.biosys.swift"
     },
     "android": {
-      "usesCleartextTraffic": true,
       "package": "com.biosys.swift",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/biosys_swift_logo.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#111827"
       },
       "permissions": [
+        "android.permission.INTERNET",
         "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "INTERNET",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
@@ -40,7 +39,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/biosys_swift_logo.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-dev-client",

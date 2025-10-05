@@ -51,8 +51,11 @@ function MobileMonitorScreen() {
   }, [stats.isRunning]);
 
   const initializeSensor = async () => {
+    let currentStep = 'Starting';
     try {
-      console.log('🔧 SIMPLIFIED Init - Step 1: Device ID...');
+      // Step 1: Device ID
+      currentStep = 'Device ID creation';
+      console.log('🔧 INIT Step 1: Device ID...');
       
       let id = await AsyncStorage.getItem('device_id');
       if (!id) {
@@ -62,43 +65,104 @@ function MobileMonitorScreen() {
       setDeviceId(id);
       console.log('✅ Device ID OK:', id);
 
-      console.log('🔧 SIMPLIFIED Init - Step 2: Location...');
-      await locationServiceRef.current.requestPermission();
-      const location = await locationServiceRef.current.getCurrentLocation();
-      if (location) {
-        setCurrentLocation({ latitude: location.latitude, longitude: location.longitude });
-        console.log('✅ Location OK:', location.latitude, location.longitude);
-      } else {
-        console.log('⚠️ No location, continuing...');
+      // Step 2: Location (with timeout)
+      currentStep = 'Location service';
+      console.log('🔧 INIT Step 2: Location (5s timeout)...');
+      try {
+        const locationPromise = (async () => {
+          await locationServiceRef.current.requestPermission();
+          return await locationServiceRef.current.getCurrentLocation();
+        })();
+        
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Location timeout')), 5000)
+        );
+        
+        const location = await Promise.race([locationPromise, timeoutPromise]) as any;
+        if (location && location.latitude) {
+          setCurrentLocation({ latitude: location.latitude, longitude: location.longitude });
+          console.log('✅ Location OK:', location.latitude, location.longitude);
+        } else {
+          console.log('⚠️ No location, using defaults');
+        }
+      } catch (locationError) {
+        console.warn('⚠️ Location failed (using defaults):', locationError instanceof Error ? locationError.message : String(locationError));
       }
 
+      // Step 3: Threshold
+      currentStep = 'Threshold retrieval';
       const threshold = await AsyncStorage.getItem('threshold');
+      console.log('🔧 Threshold:', threshold || '0.9 (default)');
 
-      console.log('🔧 SIMPLIFIED Init - Step 3: SensorService...');
-      const sensor = new SensorService(
-        {
-          deviceId: id,
-          segmentDuration: 5000,
-          detectionThreshold: threshold ? parseFloat(threshold) : 0.9,
-          latitude: location?.latitude || -42.8821,
-          longitude: location?.longitude || 147.3272,
-        },
-        setStats
-      );
-
-      console.log('🔧 SIMPLIFIED Init - Step 4: Model initialization...');
-      await sensor.initialize();
-      console.log('✅ Model initialized OK');
+      // Step 4: SensorService creation
+      currentStep = 'SensorService creation';
+      console.log('🔧 INIT Step 3: Creating SensorService...');
+      console.log('  📋 With config:', {
+        deviceId: id,
+        segmentDuration: 5000,
+        threshold: threshold ? parseFloat(threshold) : 0.9,
+        lat: currentLocation?.latitude || -42.8821,
+        lon: currentLocation?.longitude || 147.3272
+      });
       
+      let sensor;
+      try {
+        sensor = new SensorService(
+          {
+            deviceId: id,
+            segmentDuration: 5000,
+            detectionThreshold: threshold ? parseFloat(threshold) : 0.9,
+            latitude: currentLocation?.latitude || -42.8821,
+            longitude: currentLocation?.longitude || 147.3272,
+          },
+          setStats
+        );
+        console.log('✅ SensorService created, object type:', typeof sensor);
+      } catch (sensorError) {
+        console.error('❌ FAILED at SensorService creation:', sensorError);
+        throw new Error(`SensorService creation failed: ${sensorError instanceof Error ? sensorError.message : String(sensorError)}`);
+      }
+
+      // Step 5: Model initialization
+      currentStep = 'Model initialization';
+      console.log('🔧 INIT Step 4: Initializing model...');
+      console.log('  🔧 About to call sensor.initialize()...');
+      try {
+        console.log('  ⏳ Calling initialize()...');
+        await sensor.initialize();
+        console.log('  ✅ initialize() returned successfully');
+        console.log('✅ Model initialized successfully');
+      } catch (modelError) {
+        console.error('❌ FAILED at model initialization:', modelError);
+        throw new Error(`Model initialization failed: ${modelError instanceof Error ? modelError.message : String(modelError)}`);
+      }
+      
+      // Step 6: Final setup
+      console.log('🔧 INIT Step 5: Final setup...');
+      console.log('  📦 Setting sensorServiceRef.current...');
       sensorServiceRef.current = sensor;
+      console.log('  ✅ sensorServiceRef.current set');
+      
+      console.log('  🎛️ Calling setIsInitialized(true)...');
       setIsInitialized(true);
-      console.log('🎉 ALL INITIALIZATION COMPLETE! Button enabled.');
+      console.log('  ✅ setIsInitialized called');
+      
+      console.log('🎉 INITIALIZATION COMPLETE - App ready!');
+      console.log('  📊 Final state: isInitialized should now be TRUE');
+      
     } catch (error: unknown) {
-      console.error('❌ CRASH at step:', error);
+      console.error('❌ INITIALIZATION CRASHED at:', currentStep);
+      console.error('Error object:', error);
       console.error('Error type:', typeof error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      alert(`Init failed: ${error instanceof Error ? error.message : String(error)}`);
-      // Still set initialized to true so user can see the error and try button
+      console.error('Error name:', error instanceof Error ? error.name : 'Unknown');
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Show detailed alert
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(`❌ Initialization Failed at: ${currentStep}\n\nError: ${errorMsg}\n\nCheck terminal logs for details.`);
+      
+      // Set initialized anyway so UI is responsive
       setIsInitialized(true);
     }
   };

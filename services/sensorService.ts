@@ -143,15 +143,52 @@ export class SensorService {
    * @throws Error if model creation or initialization fails
    */
   async initialize(): Promise<void> {
-    // Auto-detect and create appropriate detection model
-    // (BirdNET if EXPO_PUBLIC_BIRDNET_SERVER_URL is set, else mock model)
-    this.detectionModel = await ModelFactory.autoDetectAndCreate(
-      this.config.detectionThreshold
-    );
+    console.log('🔧 SensorService.initialize() START');
+    
+    try {
+      // Step 1: Create detection model
+      console.log('  📦 Step 1: Creating detection model via ModelFactory...');
+      console.log('    - Threshold:', this.config.detectionThreshold);
+      
+      this.detectionModel = await ModelFactory.autoDetectAndCreate(
+        this.config.detectionThreshold
+      );
+      
+      console.log('  ✅ Step 1 complete: Model created');
+      console.log('    - Model type:', this.detectionModel?.constructor?.name || 'unknown');
 
-    await this.storageService.initialize();
-    await this.locationService.requestPermission();
-    this.updateStats();
+      // Step 2: Initialize storage service
+      console.log('  📦 Step 2: Initializing storage service...');
+      await this.storageService.initialize();
+      console.log('  ✅ Step 2 complete: Storage initialized');
+
+      // Step 3: Request location permission (with timeout)
+      console.log('  📦 Step 3: Requesting location permission (5s timeout)...');
+      try {
+        const permissionPromise = this.locationService.requestPermission();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Location permission timeout')), 5000)
+        );
+        
+        await Promise.race([permissionPromise, timeoutPromise]);
+        console.log('  ✅ Step 3 complete: Location permission granted');
+      } catch (error) {
+        console.warn('  ⚠️ Step 3: Location permission failed (continuing anyway):', error instanceof Error ? error.message : String(error));
+      }
+
+      // Step 4: Update stats
+      console.log('  📦 Step 4: Updating stats...');
+      this.updateStats();
+      console.log('  ✅ Step 4 complete: Stats updated');
+
+      console.log('✅ SensorService.initialize() COMPLETE');
+    } catch (error) {
+      console.error('❌ SensorService.initialize() FAILED:', error);
+      console.error('  Error type:', typeof error);
+      console.error('  Error message:', error instanceof Error ? error.message : String(error));
+      console.error('  Error stack:', error instanceof Error ? error.stack : 'No stack');
+      throw error;
+    }
   }
 
   /**
@@ -164,22 +201,55 @@ export class SensorService {
    * @throws Error if audio capture fails (e.g., microphone permission denied)
    */
   async start(): Promise<void> {
+    console.log('🔧 SensorService.start() CALLED');
+    console.log('  📊 Current isRunning:', this.stats.isRunning);
+    
     // Prevent double-start
     if (this.stats.isRunning) {
+      console.log('  ⚠️ Already running, returning early');
       return;
     }
 
     // Reset error state when starting fresh
+    console.log('  🔧 Resetting error counters...');
     this.consecutiveErrors = 0;
     this.stats.consecutiveErrors = 0;
     this.stats.lastError = undefined;
+    console.log('  ✅ Error counters reset');
 
-    // Start GPS tracking and audio capture
-    await this.locationService.startTracking();
-    await this.audioCapture.start();
+    // Start GPS tracking (with timeout)
+    console.log('  📍 Step 1: Starting GPS tracking (5s timeout)...');
+    try {
+      const gpsPromise = this.locationService.startTracking();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('GPS tracking timeout')), 5000)
+      );
+      
+      await Promise.race([gpsPromise, timeoutPromise]);
+      console.log('  ✅ GPS tracking started');
+    } catch (gpsError) {
+      console.warn('  ⚠️ GPS tracking failed (continuing without live GPS):', gpsError instanceof Error ? gpsError.message : String(gpsError));
+      // Continue anyway - we have fallback coordinates
+    }
 
+    // Start audio capture
+    console.log('  🎤 Step 2: Starting audio capture...');
+    try {
+      await this.audioCapture.start();
+      console.log('  ✅ Audio capture started');
+    } catch (audioError) {
+      console.error('  ❌ Audio capture failed:', audioError);
+      throw audioError;
+    }
+
+    // Update state
+    console.log('  🔧 Setting isRunning = true...');
     this.stats.isRunning = true;
+    console.log('  🔧 Calling updateStats()...');
     this.updateStats();
+    console.log('  ✅ updateStats() complete');
+
+    console.log('✅ SensorService.start() COMPLETE - Monitoring active!');
   }
 
   /**

@@ -40,17 +40,31 @@ export class ModelFactory {
     }
 
     if (config.type === 'birdnet') {
-      console.log('Creating BirdNET detection model');
+      console.log('🔧 ModelFactory.createModel(): Creating BirdNET...');
+      console.log('  📦 Importing BirdNETDetectionModel...');
       const { BirdNETDetectionModel } = await import('./detectionModelBirdNET');
+      console.log('  ✅ Import successful');
 
       const birdnetConfig = {
         threshold,
         supabaseUrl: config.supabaseUrl,
         supabaseAnonKey: config.supabaseAnonKey,
       };
+      console.log('  📋 Config prepared:', {
+        threshold,
+        hasSupabaseUrl: !!config.supabaseUrl,
+        hasSupabaseKey: !!config.supabaseAnonKey
+      });
 
+      console.log('  🔧 Creating new BirdNETDetectionModel instance...');
       const model = new BirdNETDetectionModel(birdnetConfig);
+      console.log('  ✅ Instance created');
+      
+      console.log('  🔧 Calling model.initialize()...');
       await model.initialize();
+      console.log('  ✅ initialize() completed');
+      
+      console.log('✅ BirdNET model ready, returning');
       return model;
     }
 
@@ -58,17 +72,27 @@ export class ModelFactory {
   }
 
   static async autoDetectAndCreate(threshold: number = 0.9): Promise<any> {
+    console.log('🔧 ModelFactory.autoDetectAndCreate() START');
+    console.log('  📊 Input threshold:', threshold);
+    
     try {
-      console.log('🔧 ModelFactory: Using BirdNET model as default');
-      console.log('🔧 ModelFactory: Threshold:', threshold);
+      console.log('  🔧 Calling ModelFactory.createModel()...');
       const model = await ModelFactory.createModel({
         type: 'birdnet',
         threshold,
       });
-      console.log('✅ ModelFactory: Model created successfully');
+      console.log('  ✅ createModel() returned successfully');
+      console.log('    - Model type:', typeof model);
+      console.log('    - Model has initialize:', typeof model?.initialize === 'function');
+      
+      console.log('✅ ModelFactory.autoDetectAndCreate() COMPLETE');
+      console.log('  📦 Returning model to caller');
       return model;
     } catch (error) {
-      console.error('❌ ModelFactory failed:', error);
+      console.error('❌ ModelFactory.autoDetectAndCreate() FAILED');
+      console.error('  Error:', error);
+      console.error('  Error type:', typeof error);
+      console.error('  Error message:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
