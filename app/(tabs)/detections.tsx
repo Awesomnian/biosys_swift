@@ -1,9 +1,26 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
-import { MapPin, Calendar, TrendingUp } from 'lucide-react-native';
+import { MapPin, Calendar, TrendingUp, Smartphone } from 'lucide-react-native';
 import { supabase, Detection } from '../../lib/supabase';
 
-export default function DetectionsScreen() {
+function WebOnlyMessage() {
+  return (
+    <View style={styles.webContainer}>
+      <View style={styles.webContent}>
+        <Smartphone size={64} color="#10b981" />
+        <Text style={styles.webTitle}>Mobile App Only</Text>
+        <Text style={styles.webText}>
+          The Detections screen shows Swift Parrot detections recorded on your mobile device. This feature requires mobile device hardware and native storage.
+        </Text>
+        <Text style={styles.webText}>
+          Please scan the QR code with your mobile device to view detections.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function MobileDetectionsScreen() {
   const [detections, setDetections] = useState<Detection[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -209,4 +226,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
   },
+  webContainer: {
+    flex: 1,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  webContent: {
+    maxWidth: 500,
+    alignItems: 'center',
+    gap: 20,
+  },
+  webTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  webText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
 });
+
+export default function DetectionsScreen() {
+  if (Platform.OS === 'web') {
+    return <WebOnlyMessage />;
+  }
+  return <MobileDetectionsScreen />;
+}

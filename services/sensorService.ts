@@ -107,6 +107,14 @@ export class SensorService {
       this.consecutiveErrors++;
       this.stats.consecutiveErrors = this.consecutiveErrors;
 
+      if (this.consecutiveErrors >= 5) {
+        console.error('Too many consecutive errors, stopping monitoring');
+        this.stop();
+        this.stats.lastError = 'Monitoring stopped after 5 consecutive failures. Check BirdNET server connection and try again.';
+        this.updateStats();
+        return;
+      }
+
       const now = Date.now();
       if (now - this.lastErrorTime > this.errorCooldown) {
         const errorMessage = error instanceof Error ? error.message : String(error);

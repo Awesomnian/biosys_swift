@@ -5,23 +5,24 @@ import { SensorService, SensorStats } from '../../services/sensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationService } from '../../services/locationService';
 
-export default function MonitorScreen() {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webContainer}>
-        <View style={styles.webContent}>
-          <Smartphone size={64} color="#10b981" />
-          <Text style={styles.webTitle}>Mobile App Only</Text>
-          <Text style={styles.webText}>
-            BioSys: Swift is a mobile bioacoustic monitoring app that requires native device features like microphone access and GPS.
-          </Text>
-          <Text style={styles.webText}>
-            Please scan the QR code with your mobile device to use this app.
-          </Text>
-        </View>
+function WebOnlyMessage() {
+  return (
+    <View style={styles.webContainer}>
+      <View style={styles.webContent}>
+        <Smartphone size={64} color="#10b981" />
+        <Text style={styles.webTitle}>Mobile App Only</Text>
+        <Text style={styles.webText}>
+          BioSys: Swift is a mobile bioacoustic monitoring app that requires native device features like microphone access and GPS.
+        </Text>
+        <Text style={styles.webText}>
+          Please scan the QR code with your mobile device to use this app.
+        </Text>
       </View>
-    );
-  }
+    </View>
+  );
+}
+
+function MobileMonitorScreen() {
   const [stats, setStats] = useState<SensorStats>({
     isRunning: false,
     totalSegmentsProcessed: 0,
@@ -80,7 +81,7 @@ export default function MonitorScreen() {
       await sensor.initialize();
       sensorServiceRef.current = sensor;
       setIsInitialized(true);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to initialize sensor:', error);
     }
   };
@@ -99,7 +100,7 @@ export default function MonitorScreen() {
       setIsStarting(true);
       try {
         await sensorServiceRef.current.start();
-      } catch (error) {
+      } catch (error: unknown) {
         alert('Failed to start audio capture. Please grant microphone permissions.');
         setIsStarting(false);
       }
@@ -222,6 +223,13 @@ export default function MonitorScreen() {
             <Text style={styles.errorCount}>
               {stats.consecutiveErrors} consecutive error{stats.consecutiveErrors === 1 ? '' : 's'}
             </Text>
+          )}
+          {stats.lastError.includes('BirdNET') && (
+            <View style={styles.errorHint}>
+              <Text style={styles.errorHintText}>
+                Make sure your BirdNET server is accessible from this device. If using ngrok, the URL must be reachable from your mobile network.
+              </Text>
+            </View>
           )}
         </View>
       )}
@@ -436,4 +444,22 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 8,
   },
+  errorHint: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#374151',
+  },
+  errorHintText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    lineHeight: 18,
+  },
 });
+
+export default function MonitorScreen() {
+  if (Platform.OS === 'web') {
+    return <WebOnlyMessage />;
+  }
+  return <MobileMonitorScreen />;
+}
