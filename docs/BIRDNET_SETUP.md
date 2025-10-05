@@ -1,5 +1,27 @@
 # BirdNET Integration Guide
 
+> **⚠️ IMPORTANT UPDATE (January 2025):**
+> The BirdNET-Analyzer repository has been restructured. The old installation method with `requirements.txt` and `server.py` no longer exists.
+> **Use Docker instead** (see Quick Start below) or check the [official documentation](https://birdnet-team.github.io/BirdNET-Analyzer/).
+
+## TL;DR - Quick Commands
+
+**Run BirdNET server locally (easiest):**
+```bash
+docker pull benjaminloeffel/birdnet-inference-api
+docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+```
+
+**Test it works:**
+```bash
+# Server should be running on http://localhost:8080
+curl http://localhost:8080/health
+```
+
+That's it! Server is ready for your app.
+
+---
+
 This guide shows you how to integrate BirdNET's pre-trained bird sound recognition into your Swift Parrot Detection app.
 
 ## Overview
@@ -27,34 +49,66 @@ Your App (Detection Results)
 
 ## Quick Start (Local Development)
 
+**⚠️ Important Update (2025):** BirdNET-Analyzer has been restructured. The old `requirements.txt` and `server.py` method no longer exists.
+
 ### Step 1: Install BirdNET
 
+**Option A: Using Docker (Recommended - Easiest)**
+
 ```bash
-# Clone BirdNET repository
-git clone https://github.com/birdnet-team/BirdNET-Analyzer
-cd BirdNET-Analyzer
+# Pull community-maintained BirdNET API server
+docker pull benjaminloeffel/birdnet-inference-api
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Run on port 8080
+docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
 ```
+
+**Option B: Using pip**
+
+```bash
+# Install BirdNET as a Python package
+pip install birdnet
+
+# Verify installation
+python -m birdnet_analyzer.analyze --help
+```
+
+**Requires:** Python 3.10, 3.11, or 3.12
 
 ### Step 2: Start BirdNET Server
 
-```bash
-# Run on localhost (default port 8080)
-python server.py --host 0.0.0.0 --port 8080
+**⚠️ Server Status:** The official BirdNET API server is being reworked by the team.
 
-# Or specify custom port
-python server.py --host 0.0.0.0 --port 8000
+**Current Working Solutions:**
+
+**🐳 Docker Method (Recommended):**
+
+```bash
+# Run community BirdNET API
+docker run -p 8080:8080 benjaminloeffel/birdnet-inference-api
+
+# Or use BirdNET-Go (alternative implementation with built-in API)
+docker run -p 8080:8080 ghcr.io/tphakala/birdnet-go:latest
 ```
+
+**🐍 Python Method (May not have server mode yet):**
+
+Check if server module is available:
+```bash
+python -m birdnet_analyzer --help
+# Look for server-related commands
+```
+
+**Alternative: BirdNET-Go**
+
+Download from: https://github.com/tphakala/birdnet-go
+- Full-featured BirdNET implementation in Go
+- Built-in web server and API
+- Real-time analysis support
 
 You should see:
 ```
-BirdNET server started on http://0.0.0.0:8080
+Server listening on http://0.0.0.0:8080
 ```
 
 ### Step 3: Deploy Edge Function
@@ -116,45 +170,87 @@ await sensor.initialize();
 
 For production use, deploy BirdNET to a cloud server.
 
-### Option 1: Railway (Easiest)
+### Option 1: Railway with Docker (Easiest)
 
 1. Create account at [Railway.app](https://railway.app)
-2. Click "New Project" → "Deploy from GitHub"
-3. Fork BirdNET-Analyzer to your GitHub
-4. Connect repository
-5. Set start command: `python server.py --host 0.0.0.0 --port 8080`
-6. Deploy
-7. Copy the public URL (e.g., `https://your-app.railway.app`)
+2. Click "New Project" → "Deploy Docker Image"
+3. Enter: `benjaminloeffel/birdnet-inference-api`
+4. Set port to 8080
+5. Deploy
+6. Copy the public URL (e.g., `https://your-app.railway.app`)
 
 **Set environment variable in Supabase:**
 - Go to your Supabase project → Settings → Edge Functions
 - Add secret: `BIRDNET_SERVER_URL=https://your-app.railway.app`
 
-### Option 2: Digital Ocean Droplet
+**Cost:** ~$5/month on Hobby plan
+
+### Option 2: Digital Ocean Droplet with Docker
 
 ```bash
 # SSH into your droplet
 ssh root@your-droplet-ip
 
-# Install dependencies
+# Install Docker
 apt update
-apt install python3 python3-pip git
+apt install docker.io
 
-# Clone BirdNET
-git clone https://github.com/birdnet-team/BirdNET-Analyzer
-cd BirdNET-Analyzer
+# Pull and run BirdNET container
+docker pull benjaminloeffel/birdnet-inference-api
+docker run -d -p 8080:8080 --restart=always \
+  --name birdnet benjaminloeffel/birdnet-inference-api
 
-# Install Python packages
-pip3 install -r requirements.txt
-
-# Run as service (using systemd)
-sudo nano /etc/systemd/system/birdnet.service
+# Check status
+docker ps
+docker logs birdnet
 ```
 
-**Service file:**
+**Cost:** $6-12/month depending on droplet size
+
+### Option 3: Fly.io with Docker
+
+```bash
+# Install Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Create fly.toml
+cat > fly.toml << EOF
+app = "your-birdnet-app"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+EOF
+
+# Deploy
+fly launch --image benjaminloeffel/birdnet-inference-api
+fly deploy
+```
+
+**Cost:** Free tier available, ~$3/month after
+
+### Option 4: Using BirdNET-Go (Alternative)
+
+BirdNET-Go is a Go implementation with excellent performance:
+
+```bash
+# Download latest release from:
+# https://github.com/tphakala/birdnet-go/releases
+
+# Run with Docker
+docker run -d -p 8080:8080 --restart=always \
+  ghcr.io/tphakala/birdnet-go:latest
+```
+
+**Service file (for systemd):**
 ```ini
 [Unit]
-Description=BirdNET Server
+Description=BirdNET-Go Server
 After=network.target
 
 [Service]

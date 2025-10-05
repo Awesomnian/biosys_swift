@@ -148,18 +148,21 @@ The app now supports **three detection models**:
 
 ### Getting Started with Models
 
-**Quick Start:**
+**⚡ Quick Start (5 minutes):**
+- 🐳 **[BirdNET Quick Start](QUICKSTART_BIRDNET.md)** - Run BirdNET with Docker NOW (updated 2025)
+
+**Complete Guides:**
 - 📖 **[Model Documentation](docs/README_MODELS.md)** - Complete guide to all models
-- 🚀 **[BirdNET Setup](docs/BIRDNET_SETUP.md)** - Use pre-trained model (recommended)
+- 🚀 **[BirdNET Setup](docs/BIRDNET_SETUP.md)** - Full BirdNET deployment guide
 - 🔧 **[TensorFlow.js Setup](docs/TENSORFLOW_SETUP.md)** - Train your own model
 - 💡 **[Usage Examples](docs/USAGE_EXAMPLE.md)** - Code examples
 
 **Recommended Path:**
-1. Start with **Mock Model** to test the UI
-2. Deploy **BirdNET** for real detection (30 min setup)
+1. Start with **Mock Model** to test the UI (works now, no setup)
+2. Deploy **BirdNET** for real detection (5 min with Docker)
 3. Optional: Train **custom TensorFlow.js** model for offline use
 
-See [docs/README_MODELS.md](docs/README_MODELS.md) for complete details.
+> **Note:** BirdNET installation changed in 2025. Old `requirements.txt` method doesn't exist anymore. Use Docker instead (see Quick Start above).
 
 ## Storage Bucket Setup
 

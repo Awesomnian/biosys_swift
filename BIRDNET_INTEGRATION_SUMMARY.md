@@ -68,7 +68,8 @@ Seven detailed guides created:
 
 1. **BirdNET Server Running**
    ```bash
-   git clone https://github.com/birdnet-team/BirdNET-Analyzer
+   # Updated installation - see docs/BIRDNET_SETUP.md
+   docker pull benjaminloeffel/birdnet-inference-api
    cd BirdNET-Analyzer
    pip install -r requirements.txt
    python server.py --host 0.0.0.0 --port 8080
