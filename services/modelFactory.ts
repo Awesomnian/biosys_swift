@@ -58,11 +58,19 @@ export class ModelFactory {
   }
 
   static async autoDetectAndCreate(threshold: number = 0.9): Promise<any> {
-    console.log('Using BirdNET model as default');
-    return await ModelFactory.createModel({
-      type: 'birdnet',
-      threshold,
-    });
+    try {
+      console.log('🔧 ModelFactory: Using BirdNET model as default');
+      console.log('🔧 ModelFactory: Threshold:', threshold);
+      const model = await ModelFactory.createModel({
+        type: 'birdnet',
+        threshold,
+      });
+      console.log('✅ ModelFactory: Model created successfully');
+      return model;
+    } catch (error) {
+      console.error('❌ ModelFactory failed:', error);
+      throw error;
+    }
   }
 
   static async createBirdNETModel(threshold: number = 0.9): Promise<any> {

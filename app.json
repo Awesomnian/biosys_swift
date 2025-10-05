@@ -8,12 +8,22 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/biosys_swift_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#111827"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.biosys.swift"
     },
     "android": {
       "usesCleartextTraffic": true,
       "package": "com.biosys.swift",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/biosys_swift_logo.png",
+        "backgroundColor": "#111827"
+      },
       "permissions": [
         "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",

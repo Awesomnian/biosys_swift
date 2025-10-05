@@ -41,14 +41,26 @@ export class BirdNETDetectionModel {
   private initialized: boolean = false;
 
   constructor(config: BirdNETConfig) {
-    this.threshold = config.threshold;
-    console.log('🔧 BirdNET Model initialized (Supabase Storage Proxy)');
-    console.log('🎯 Detection threshold:', this.threshold);
+    try {
+      console.log('🔧 BirdNET Model constructor starting...');
+      this.threshold = config.threshold;
+      console.log('🔧 BirdNET Model initialized (Supabase Storage Proxy)');
+      console.log('🎯 Detection threshold:', this.threshold);
+    } catch (error) {
+      console.error('❌ BirdNET constructor failed:', error);
+      throw error;
+    }
   }
 
   async initialize(): Promise<void> {
-    console.log('✅ BirdNET model ready (using Supabase Edge Function)');
-    this.initialized = true;
+    try {
+      console.log('🔧 BirdNET model initializing...');
+      console.log('✅ BirdNET model ready (using Supabase Edge Function)');
+      this.initialized = true;
+    } catch (error) {
+      console.error('❌ BirdNET initialize() failed:', error);
+      throw error;
+    }
   }
 
   /**

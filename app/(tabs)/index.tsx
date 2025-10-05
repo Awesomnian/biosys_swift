@@ -52,37 +52,54 @@ function MobileMonitorScreen() {
 
   const initializeSensor = async () => {
     try {
+      console.log('🔧 SIMPLIFIED Init - Step 1: Device ID...');
+      
       let id = await AsyncStorage.getItem('device_id');
       if (!id) {
         id = `sensor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await AsyncStorage.setItem('device_id', id);
       }
       setDeviceId(id);
+      console.log('✅ Device ID OK:', id);
 
+      console.log('🔧 SIMPLIFIED Init - Step 2: Location...');
       await locationServiceRef.current.requestPermission();
       const location = await locationServiceRef.current.getCurrentLocation();
       if (location) {
         setCurrentLocation({ latitude: location.latitude, longitude: location.longitude });
+        console.log('✅ Location OK:', location.latitude, location.longitude);
+      } else {
+        console.log('⚠️ No location, continuing...');
       }
 
       const threshold = await AsyncStorage.getItem('threshold');
 
+      console.log('🔧 SIMPLIFIED Init - Step 3: SensorService...');
       const sensor = new SensorService(
         {
           deviceId: id,
           segmentDuration: 5000,
           detectionThreshold: threshold ? parseFloat(threshold) : 0.9,
-          latitude: location?.latitude,
-          longitude: location?.longitude,
+          latitude: location?.latitude || -42.8821,
+          longitude: location?.longitude || 147.3272,
         },
         setStats
       );
 
+      console.log('🔧 SIMPLIFIED Init - Step 4: Model initialization...');
       await sensor.initialize();
+      console.log('✅ Model initialized OK');
+      
       sensorServiceRef.current = sensor;
       setIsInitialized(true);
+      console.log('🎉 ALL INITIALIZATION COMPLETE! Button enabled.');
     } catch (error: unknown) {
-      console.error('Failed to initialize sensor:', error);
+      console.error('❌ CRASH at step:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Init failed: ${error instanceof Error ? error.message : String(error)}`);
+      // Still set initialized to true so user can see the error and try button
+      setIsInitialized(true);
     }
   };
 
