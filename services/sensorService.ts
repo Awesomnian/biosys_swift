@@ -1,5 +1,8 @@
 import { AudioCaptureService, AudioSegment } from './audioCapture';
-import { SwiftParrotDetectionModel, DetectionResult } from './detectionModel';
+import { DetectionResult } from './detectionModel';
+import { SwiftParrotDetectionModel as MockModel } from './detectionModel';
+import { SwiftParrotDetectionModel as TensorFlowModel } from './detectionModelTensorFlow';
+import { ModelFactory } from './modelFactory';
 import { StorageService } from './storageService';
 import { Detection } from '../lib/supabase';
 
@@ -22,7 +25,7 @@ export interface SensorStats {
 
 export class SensorService {
   private audioCapture: AudioCaptureService;
-  private detectionModel: SwiftParrotDetectionModel;
+  private detectionModel: MockModel | TensorFlowModel | null = null;
   private storageService: StorageService;
   private config: SensorConfig;
   private stats: SensorStats;
@@ -44,12 +47,13 @@ export class SensorService {
       this.handleAudioSegment.bind(this)
     );
 
-    this.detectionModel = new SwiftParrotDetectionModel(config.detectionThreshold);
     this.storageService = new StorageService();
   }
 
   async initialize(): Promise<void> {
-    await this.detectionModel.initialize();
+    this.detectionModel = await ModelFactory.autoDetectAndCreate(
+      this.config.detectionThreshold
+    );
     await this.storageService.initialize();
     this.updateStats();
   }
@@ -71,6 +75,11 @@ export class SensorService {
   }
 
   private async handleAudioSegment(segment: AudioSegment): Promise<void> {
+    if (!this.detectionModel) {
+      console.error('Detection model not initialized');
+      return;
+    }
+
     try {
       const result = await this.detectionModel.analyzeAudio(segment.blob);
 
@@ -125,7 +134,7 @@ export class SensorService {
   }
 
   updateConfig(config: Partial<SensorConfig>): void {
-    if (config.detectionThreshold !== undefined) {
+    if (config.detectionThreshold !== undefined && this.detectionModel) {
       this.detectionModel.setThreshold(config.detectionThreshold);
       this.config.detectionThreshold = config.detectionThreshold;
     }
@@ -137,5 +146,9 @@ export class SensorService {
     if (config.longitude !== undefined) {
       this.config.longitude = config.longitude;
     }
+  }
+
+  getModelName(): string {
+    return this.detectionModel?.getModelName() || 'Unknown';
   }
 }
