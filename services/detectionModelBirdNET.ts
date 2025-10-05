@@ -71,7 +71,7 @@ export class BirdNETDetectionModel {
 
     try {
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'audio.webm');
+      formData.append('file', audioBlob, 'audio.webm');
 
       console.log('Sending audio to BirdNET edge function...');
 
@@ -97,24 +97,58 @@ export class BirdNETDetectionModel {
       const result = await response.json();
 
       const inferenceTime = Date.now() - startTime;
+
+      let maxConfidence = 0;
+      let swiftParrotConfidence = 0;
+      let detectedSpecies = '';
+      const allDetections: Array<{species: string; common_name: string; scientific_name: string; confidence: number}> = [];
+
+      if (result.predictions && result.predictions.length > 0) {
+        for (const segment of result.predictions) {
+          for (const species of segment.species) {
+            const speciesName = species.species_name || '';
+            const confidence = species.probability || 0;
+
+            allDetections.push({
+              species: speciesName,
+              common_name: speciesName.split('_')[0] || speciesName,
+              scientific_name: speciesName,
+              confidence: confidence
+            });
+
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+              detectedSpecies = speciesName;
+            }
+
+            if (speciesName.toLowerCase().includes('swift') || speciesName.toLowerCase().includes('lathamus')) {
+              swiftParrotConfidence = Math.max(swiftParrotConfidence, confidence);
+            }
+          }
+        }
+      }
+
+      const finalConfidence = swiftParrotConfidence > 0 ? swiftParrotConfidence : maxConfidence;
+      const isSwiftParrot = swiftParrotConfidence >= this.threshold;
+
       console.log(
-        `BirdNET analysis completed in ${inferenceTime}ms, confidence: ${result.confidence.toFixed(3)}`
+        `BirdNET analysis completed in ${inferenceTime}ms, top confidence: ${maxConfidence.toFixed(3)}, swift parrot: ${swiftParrotConfidence.toFixed(3)}`
       );
 
-      if (result.isPositive) {
+      if (isSwiftParrot) {
         console.log(
-          `Swift Parrot detected! Species: ${result.commonName || result.scientificName}`
+          `Swift Parrot detected! Confidence: ${swiftParrotConfidence.toFixed(3)}`
         );
       }
 
       return {
-        confidence: Math.min(0.99, Math.max(0.0, result.confidence)),
+        confidence: finalConfidence,
         modelName: 'BirdNET',
-        isPositive: result.confidence >= this.threshold,
-        species: result.species,
-        commonName: result.commonName,
-        scientificName: result.scientificName,
-        allDetections: result.allDetections,
+        isPositive: isSwiftParrot,
+        species: detectedSpecies,
+        commonName: detectedSpecies.split('_')[0] || detectedSpecies,
+        scientificName: detectedSpecies,
+        allDetections: allDetections,
       };
     } catch (error) {
       console.error('BirdNET analysis failed:', error);

@@ -71,6 +71,10 @@ export class SensorService {
       return;
     }
 
+    this.consecutiveErrors = 0;
+    this.stats.consecutiveErrors = 0;
+    this.stats.lastError = undefined;
+
     await this.locationService.startTracking();
     await this.audioCapture.start();
     this.stats.isRunning = true;
