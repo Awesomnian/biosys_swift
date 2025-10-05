@@ -209,11 +209,43 @@ export class BirdNETDetectionModel {
       console.log('Headers:', JSON.stringify(headers));
       console.log('Making POST request...');
 
-      // Send POST request to BirdNET API
-      const response = await fetch(this.edgeFunctionUrl, {
-        method: 'POST',
-        headers,
-        body: formData,
+      // WORKAROUND: Use XMLHttpRequest instead of fetch for React Native compatibility
+      const response = await new Promise<Response>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.onload = () => {
+          const responseHeaders = new Headers();
+          const headerPairs = xhr.getAllResponseHeaders().trim().split('\r\n');
+          headerPairs.forEach(line => {
+            const parts = line.split(': ');
+            if (parts.length === 2) {
+              responseHeaders.set(parts[0], parts[1]);
+            }
+          });
+
+          resolve({
+            ok: xhr.status >= 200 && xhr.status < 300,
+            status: xhr.status,
+            statusText: xhr.statusText,
+            headers: responseHeaders,
+            text: async () => xhr.responseText,
+            json: async () => JSON.parse(xhr.responseText),
+          } as Response);
+        };
+
+        xhr.onerror = () => {
+          console.error('XHR Error:', xhr.status, xhr.statusText);
+          reject(new Error(`Network request failed: ${xhr.statusText || 'Unknown error'}`));
+        };
+
+        xhr.open('POST', this.edgeFunctionUrl);
+
+        // Set headers
+        Object.entries(headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+
+        xhr.send(formData as any);
       });
 
       console.log('Response status:', response.status, response.statusText);
