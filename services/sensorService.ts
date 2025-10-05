@@ -20,6 +20,8 @@ export interface SensorStats {
   pendingUploads: number;
   lastDetection?: Date;
   currentConfidence?: number;
+  consecutiveErrors?: number;
+  lastError?: string;
 }
 
 export class SensorService {
@@ -30,6 +32,9 @@ export class SensorService {
   private config: SensorConfig;
   private stats: SensorStats;
   private onStatsUpdate?: (stats: SensorStats) => void;
+  private consecutiveErrors: number = 0;
+  private lastErrorTime: number = 0;
+  private errorCooldown: number = 30000;
 
   constructor(config: SensorConfig, onStatsUpdate?: (stats: SensorStats) => void) {
     this.config = config;
@@ -40,6 +45,7 @@ export class SensorService {
       totalSegmentsProcessed: 0,
       totalDetections: 0,
       pendingUploads: 0,
+      consecutiveErrors: 0,
     };
 
     this.audioCapture = new AudioCaptureService(
@@ -86,6 +92,9 @@ export class SensorService {
     try {
       const result = await this.detectionModel.analyzeAudio(segment.blob);
 
+      this.consecutiveErrors = 0;
+      this.stats.consecutiveErrors = 0;
+      this.stats.lastError = undefined;
       this.stats.totalSegmentsProcessed++;
       this.stats.currentConfidence = result.confidence;
 
@@ -95,7 +104,23 @@ export class SensorService {
 
       this.updateStats();
     } catch (error) {
-      console.error('Error processing audio segment:', error);
+      this.consecutiveErrors++;
+      this.stats.consecutiveErrors = this.consecutiveErrors;
+
+      const now = Date.now();
+      if (now - this.lastErrorTime > this.errorCooldown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to fetch')) {
+          this.stats.lastError = 'BirdNET server unreachable. Check server configuration.';
+        } else {
+          this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
+        }
+
+        console.error('Error processing audio segment:', error);
+        this.lastErrorTime = now;
+        this.updateStats();
+      }
     }
   }
 

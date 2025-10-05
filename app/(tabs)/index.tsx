@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Upload, Radio, MapPin, Smartphone } from 'lucide-react-native';
+import { Play, Pause, Upload, Radio, MapPin, Smartphone, AlertCircle } from 'lucide-react-native';
 import { SensorService, SensorStats } from '../../services/sensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationService } from '../../services/locationService';
@@ -211,6 +211,21 @@ export default function MonitorScreen() {
         </View>
       </View>
 
+      {stats.lastError && (
+        <View style={styles.errorCard}>
+          <View style={styles.errorHeader}>
+            <AlertCircle color="#ef4444" size={20} />
+            <Text style={styles.errorTitle}>Connection Issue</Text>
+          </View>
+          <Text style={styles.errorText}>{stats.lastError}</Text>
+          {(stats.consecutiveErrors ?? 0) > 0 && (
+            <Text style={styles.errorCount}>
+              {stats.consecutiveErrors} consecutive error{stats.consecutiveErrors === 1 ? '' : 's'}
+            </Text>
+          )}
+        </View>
+      )}
+
       {stats.lastDetection && (
         <View style={styles.lastDetection}>
           <Text style={styles.lastDetectionLabel}>Last Detection:</Text>
@@ -390,5 +405,35 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  errorCard: {
+    margin: 16,
+    marginTop: 0,
+    padding: 16,
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#fca5a5',
+    lineHeight: 20,
+  },
+  errorCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 8,
   },
 });
