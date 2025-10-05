@@ -17,6 +17,7 @@ export interface BirdNETConfig {
   threshold: number;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  birdnetServerUrl?: string;
 }
 
 export class BirdNETDetectionModel {
@@ -24,23 +25,35 @@ export class BirdNETDetectionModel {
   private edgeFunctionUrl: string;
   private anonKey: string;
   private initialized: boolean = false;
+  private useDirectServer: boolean = false;
 
   constructor(config: BirdNETConfig) {
     this.threshold = config.threshold;
 
-    const supabaseUrl =
-      config.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey =
-      config.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    const birdnetServerUrl =
+      config.birdnetServerUrl || process.env.EXPO_PUBLIC_BIRDNET_SERVER_URL;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error(
-        'Supabase URL and Anon Key are required for BirdNET model'
-      );
+    if (birdnetServerUrl) {
+      this.useDirectServer = true;
+      this.edgeFunctionUrl = `${birdnetServerUrl}/api/v1/analyze`;
+      this.anonKey = '';
+      console.log('Using direct BirdNET server:', this.edgeFunctionUrl);
+    } else {
+      const supabaseUrl =
+        config.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey =
+        config.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error(
+          'Either BIRDNET_SERVER_URL or Supabase URL and Anon Key are required'
+        );
+      }
+
+      this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
+      this.anonKey = supabaseAnonKey;
+      console.log('Using Supabase Edge Function:', this.edgeFunctionUrl);
     }
-
-    this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
-    this.anonKey = supabaseAnonKey;
   }
 
   async initialize(): Promise<void> {
@@ -62,11 +75,15 @@ export class BirdNETDetectionModel {
 
       console.log('Sending audio to BirdNET edge function...');
 
+      const headers: Record<string, string> = {};
+
+      if (!this.useDirectServer && this.anonKey) {
+        headers['Authorization'] = `Bearer ${this.anonKey}`;
+      }
+
       const response = await fetch(this.edgeFunctionUrl, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.anonKey}`,
-        },
+        headers,
         body: formData,
       });
 
