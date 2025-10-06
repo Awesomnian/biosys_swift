@@ -60,7 +60,7 @@ Mobile App → Supabase Storage → Edge Function → BirdNET Docker → Results
 
 ## Documentation
 
-- **Repo hygiene aka "Dumping It All In /docs" completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience.
+- **Repo hygiene:** aka "Dumping It All In /docs" completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience.
 
 ---
 
