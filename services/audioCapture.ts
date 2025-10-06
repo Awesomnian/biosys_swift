@@ -11,7 +11,7 @@ export interface AudioSegment {
  * Audio Capture Service
  * 
  * Records 5-second audio segments in M4A format.
- * M4A is converted to WAV server-side before BirdNET analysis.
+ * Files saved to persistent storage for later processing.
  */
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
@@ -19,6 +19,7 @@ export class AudioCaptureService {
   private segmentDuration: number;
   private onSegmentReady: (segment: AudioSegment) => void;
   private recordingTimer: ReturnType<typeof setTimeout> | null = null;
+  private audioDirectory: string;
 
   constructor(
     segmentDuration: number = 5000,
@@ -26,6 +27,7 @@ export class AudioCaptureService {
   ) {
     this.segmentDuration = segmentDuration;
     this.onSegmentReady = onSegmentReady;
+    this.audioDirectory = `${FileSystem.documentDirectory}audio/`;
   }
 
   async start(): Promise<void> {
@@ -38,6 +40,11 @@ export class AudioCaptureService {
     }
 
     try {
+      const dirInfo = await FileSystem.getInfoAsync(this.audioDirectory);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(this.audioDirectory, { intermediates: true });
+      }
+
       console.log('  ✅ Microphone permission assumed (manually granted)');
 
       console.log('  🔧 Setting audio mode...');
@@ -70,7 +77,6 @@ export class AudioCaptureService {
     try {
       const segmentStartTime = Date.now();
 
-      // Record in M4A - converted to WAV server-side
       const { recording } = await Audio.Recording.createAsync({
         android: {
           extension: '.m4a',
@@ -100,17 +106,27 @@ export class AudioCaptureService {
         const currentRecording = this.recording;
         if (currentRecording && this.isRecording) {
           try {
-            const uri = currentRecording.getURI();
             await currentRecording.stopAndUnloadAsync();
             this.recording = null;
 
-            if (uri) {
-              const fileInfo = await FileSystem.getInfoAsync(uri);
+            const tempUri = currentRecording.getURI();
+            if (tempUri) {
+              const filename = `recording-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.m4a`;
+              const persistentUri = this.audioDirectory + filename;
+              
+              await FileSystem.copyAsync({
+                from: tempUri,
+                to: persistentUri,
+              });
+
+              await FileSystem.deleteAsync(tempUri, { idempotent: true });
+
+              const fileInfo = await FileSystem.getInfoAsync(persistentUri);
               if (fileInfo.exists) {
                 const duration = Date.now() - segmentStartTime;
 
                 this.onSegmentReady({
-                  uri,
+                  uri: persistentUri,
                   timestamp: new Date(segmentStartTime),
                   duration,
                 });
@@ -145,11 +161,7 @@ export class AudioCaptureService {
 
     if (this.recording) {
       try {
-        const uri = this.recording.getURI();
         await this.recording.stopAndUnloadAsync();
-        if (uri) {
-          await FileSystem.deleteAsync(uri, { idempotent: true });
-        }
       } catch (error) {
         console.error('Error stopping recording:', error);
       }

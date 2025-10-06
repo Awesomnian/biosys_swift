@@ -1,11 +1,9 @@
 /**
  * BirdNET Detection Model - Local Proxy Approach
  * 
- * ARCHITECTURE:
- * 1. Upload M4A audio to local proxy (via ngrok)
- * 2. Proxy converts M4A→WAV using ffmpeg
- * 3. Proxy forwards WAV to BirdNET
- * 4. Proxy returns predictions
+ * Now monitors for:
+ * - Swift Parrot (Lathamus discolor)
+ * - Orange-bellied Parrot (Neophema chrysogaster)
  */
 
 import { supabase } from '../lib/supabase';
@@ -105,7 +103,6 @@ export class BirdNETDetectionModel {
 
       console.log('  📦 File size:', fileInfo.size, 'bytes');
 
-      // Upload to local proxy via ngrok
       console.log('  📤 Uploading to proxy...');
       const response = await FileSystem.uploadAsync(
         'https://pruinose-alise-uncooled.ngrok-free.dev/convert',
@@ -129,30 +126,37 @@ export class BirdNETDetectionModel {
       console.log('  🔍 BirdNET raw response:', JSON.stringify(predictions).substring(0, 500));
       console.log(`  ✅ Analysis complete in ${duration}ms`);
 
-      // Extract predictions array from response object
       const predictionsList = predictions.predictions || [];
       if (!Array.isArray(predictionsList)) {
         throw new Error('Invalid response format from BirdNET');
       }
 
-      // Flatten species from all time segments
       const allSpecies = predictionsList.flatMap(segment => segment.species || []);
       console.log(`  📊 Raw detections: ${allSpecies.length}`);
 
-      // Filter by threshold
       const validPredictions = allSpecies.filter((p: any) => p.probability >= this.threshold);
       console.log(`  🎯 Predictions above threshold (${this.threshold}): ${validPredictions.length}`);
 
-      // Check for Swift Parrot
+      // Check for target species: Swift Parrot OR Orange-bellied Parrot
       const swiftParrot = validPredictions.find((p: any) => 
         p.species_name && p.species_name.toLowerCase().includes('lathamus')
       );
+      
+      const orangeBelliedParrot = validPredictions.find((p: any) => 
+        p.species_name && p.species_name.toLowerCase().includes('neophema chrysogaster')
+      );
 
-      const isPositive = !!swiftParrot;
+      // Positive if either species detected
+      const targetDetection = swiftParrot || orangeBelliedParrot;
+      const isPositive = !!targetDetection;
       const topPrediction = validPredictions[0];
 
-      console.log('  🦜 Swift Parrot detected:', isPositive ? 'YES' : 'NO');
-      if (topPrediction) {
+      console.log('  🦜 Swift Parrot detected:', swiftParrot ? 'YES' : 'NO');
+      console.log('  🦜 Orange-bellied Parrot detected:', orangeBelliedParrot ? 'YES' : 'NO');
+      
+      if (targetDetection) {
+        console.log('  🏆 Target detection:', targetDetection.species_name, `(${(targetDetection.probability * 100).toFixed(1)}%)`);
+      } else if (topPrediction) {
         console.log('  🏆 Top detection:', topPrediction.species_name, `(${(topPrediction.probability * 100).toFixed(1)}%)`);
       }
 
@@ -163,20 +167,13 @@ export class BirdNETDetectionModel {
         confidence: d.probability,
       }));
 
-      // Clean up local file
-      try {
-        await FileSystem.deleteAsync(audioUri, { idempotent: true });
-      } catch (deleteError) {
-        console.warn('  ⚠️ Could not delete local file:', deleteError);
-      }
-
       return {
-        confidence: swiftParrot?.probability || topPrediction?.probability || 0,
+        confidence: targetDetection?.probability || topPrediction?.probability || 0,
         modelName: 'BirdNET',
         isPositive,
-        species: swiftParrot?.species_name || topPrediction?.species_name,
-        commonName: swiftParrot?.species_name?.split('_')[1] || topPrediction?.species_name?.split('_')[1],
-        scientificName: swiftParrot?.species_name?.split('_')[0] || topPrediction?.species_name?.split('_')[0],
+        species: targetDetection?.species_name || topPrediction?.species_name,
+        commonName: targetDetection?.species_name?.split('_')[1] || topPrediction?.species_name?.split('_')[1],
+        scientificName: targetDetection?.species_name?.split('_')[0] || topPrediction?.species_name?.split('_')[0],
         allDetections,
       };
 
@@ -184,12 +181,6 @@ export class BirdNETDetectionModel {
       const elapsedTime = Date.now() - startTime;
       console.error(`❌ BirdNET analysis failed after ${elapsedTime}ms`);
       console.error('Error details:', error);
-
-      try {
-        await FileSystem.deleteAsync(audioUri, { idempotent: true });
-      } catch (deleteError) {
-        // Ignore cleanup errors
-      }
 
       throw new Error(`Failed to analyze audio: ${error instanceof Error ? error.message : String(error)}`);
     }

@@ -12,7 +12,7 @@ export interface ModelFactoryConfig {
 
 export class ModelFactory {
   static async createModel(config: ModelFactoryConfig): Promise<any> {
-    const threshold = config.threshold || 0.9;
+    const threshold = config.threshold || 0.8;
 
     if (config.type === 'mock') {
       console.log('Creating mock detection model');
@@ -71,7 +71,7 @@ export class ModelFactory {
     throw new Error(`Unknown model type: ${config.type}`);
   }
 
-  static async autoDetectAndCreate(threshold: number = 0.9): Promise<any> {
+  static async autoDetectAndCreate(threshold: number = 0.8): Promise<any> {
     console.log('🔧 ModelFactory.autoDetectAndCreate() START');
     console.log('  📊 Input threshold:', threshold);
     
@@ -97,7 +97,7 @@ export class ModelFactory {
     }
   }
 
-  static async createBirdNETModel(threshold: number = 0.9): Promise<any> {
+  static async createBirdNETModel(threshold: number = 0.8): Promise<any> {
     console.log('Creating BirdNET model');
     return await ModelFactory.createModel({
       type: 'birdnet',
