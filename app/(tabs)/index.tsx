@@ -92,7 +92,7 @@ function MobileMonitorScreen() {
       // Step 3: Threshold
       currentStep = 'Threshold retrieval';
       const threshold = await AsyncStorage.getItem('threshold');
-      console.log('🔧 Threshold:', threshold || '0.9 (default)');
+      console.log('🔧 Threshold:', threshold || '0.8 (default)');
 
       // Step 4: SensorService creation
       currentStep = 'SensorService creation';
@@ -100,7 +100,7 @@ function MobileMonitorScreen() {
       console.log('  📋 With config:', {
         deviceId: id,
         segmentDuration: 5000,
-        threshold: threshold ? parseFloat(threshold) : 0.9,
+        threshold: threshold ? parseFloat(threshold) : 0.8,
         lat: currentLocation?.latitude || -42.8821,
         lon: currentLocation?.longitude || 147.3272
       });
@@ -111,7 +111,7 @@ function MobileMonitorScreen() {
           {
             deviceId: id,
             segmentDuration: 5000,
-            detectionThreshold: threshold ? parseFloat(threshold) : 0.9,
+            detectionThreshold: threshold ? parseFloat(threshold) : 0.8,
             latitude: currentLocation?.latitude || -42.8821,
             longitude: currentLocation?.longitude || 147.3272,
           },
@@ -158,11 +158,9 @@ function MobileMonitorScreen() {
       console.error('Error message:', error instanceof Error ? error.message : String(error));
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       
-      // Show detailed alert
       const errorMsg = error instanceof Error ? error.message : String(error);
       alert(`❌ Initialization Failed at: ${currentStep}\n\nError: ${errorMsg}\n\nCheck terminal logs for details.`);
       
-      // Set initialized anyway so UI is responsive
       setIsInitialized(true);
     }
   };

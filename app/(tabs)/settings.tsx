@@ -24,7 +24,7 @@ function MobileSettingsScreen() {
   const [deviceId, setDeviceId] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
-  const [threshold, setThreshold] = useState('0.9');
+  const [threshold, setThreshold] = useState('0.8');
   const [autoSync, setAutoSync] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -158,7 +158,7 @@ function MobileSettingsScreen() {
             style={styles.input}
             value={threshold}
             onChangeText={setThreshold}
-            placeholder="0.9"
+            placeholder="0.8"
             keyboardType="numeric"
             placeholderTextColor="#6b7280"
           />
