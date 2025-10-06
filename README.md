@@ -4,13 +4,10 @@ A React Native mobile app for detecting Swift Parrot calls using BirdNET ML anal
 
 ---
 
-## Current Status (2025-10-05)
+## Current Status (2025-10-07)
+App functioning, synchronisation with BirdNET for identification, upload of positive identification of Swift Parrot or Orange-bellied parrots (confidence > 80%) now uploading to Supabase and displaying in-app to user. Lat/Long, Date/Time, UniqueID and associated Positive Audio recordings saved locally and to Supabase for.
 
-**⚠️ BROKEN - Permission APIs blocking in Development Build**
-
-See [`PROJECT_STATUS_2025-10-05.md`](PROJECT_STATUS_2025-10-05.md) for full details.
-
----
+Mapping next. After bed.
 
 ## What It Should Do
 
