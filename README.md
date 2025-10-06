@@ -54,18 +54,15 @@ npx expo start
 
 ## Known Issues
 
-1. GPS permission request hangs in development build
-2. Microphone permission request hangs in development build
-3. Button visual feedback not working
-4. BirdNET audio format compatibility (M4A vs WAV)
+1. Manual Synch button in-app doesn't work (currently fully automated for testing) so no "offline/field mode" for upload later.
+2. Lat/Long not displaying for filtering in database, although it is being captured. Displaying on-App.
+3. Confidence level not displaying in Supabase for display or filtering. It is being captured and is being displayed in-app.
 
 ---
 
 ## Documentation
 
-- **Current Status:** [`PROJECT_STATUS_2025-10-05.md`](PROJECT_STATUS_2025-10-05.md)
-- **Implementation Plan:** [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
-- **Archived Docs:** `docs/archive/2025-10-05/` (historical attempts)
+- **Repo hygeine aka Dumping It All in /docs completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience into them.
 
 ---
 
@@ -75,4 +72,4 @@ https://github.com/Awesomnian/biosys_swift
 
 ---
 
-**For detailed status and next steps, see PROJECT_STATUS_2025-10-05.md**
+
