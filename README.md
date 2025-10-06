@@ -28,18 +28,15 @@ Mobile App → Supabase Storage → Edge Function → BirdNET Docker → Results
 
 ## Quick Start
 
-### Prerequisites
+### Prerequisites - Inverse Order of Priority
+
 - Node.js 18+
 - Docker (for BirdNET)
 - ngrok (for BirdNET API tunnel)
 - Android phone with USB debugging OR Expo Go app
-
-### Setup
-```bash
-cd C:\AI\biosys_swift\git
-npm install
-npx expo start
-```
+- Internet
+- Computer
+- Pulse
 
 ---
 
@@ -57,12 +54,13 @@ npx expo start
 1. Manual Synch button in-app doesn't work (currently fully automated for testing) so no "offline/field mode" for upload later.
 2. Lat/Long not displaying for filtering in database, although it is being captured. Displaying on-App.
 3. Confidence level not displaying in Supabase for display or filtering. It is being captured and is being displayed in-app.
+4. I really don't like what you've done with your hair. It's fine. I'm just saying that I liked it better before.
 
 ---
 
 ## Documentation
 
-- **Repo hygeine aka Dumping It All in /docs completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience into them.
+- **Repo hygiene aka "Dumping It All In /docs" completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience.
 
 ---
 
