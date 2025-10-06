@@ -40,14 +40,6 @@ Mobile App → Supabase Storage → Edge Function → BirdNET Docker → Results
 
 ---
 
-## Infrastructure
-
-- **Supabase:** phayiovbyaaqimlshmxo.supabase.co
-- **BirdNET Docker:** localhost:8080
-- **ngrok Tunnel:** https://pruinose-alise-uncooled.ngrok-free.dev
-- **Edge Function:** analyze-birdcall (deployed)
-
----
 
 ## Known Issues
 
