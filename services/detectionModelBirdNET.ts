@@ -1,15 +1,11 @@
 /**
- * BirdNET Detection Model - Supabase Storage Proxy Approach
+ * BirdNET Detection Model - Local Proxy Approach
  * 
  * ARCHITECTURE:
- * 1. Upload audio to Supabase Storage (reliable on Android)
- * 2. Call Supabase Edge Function with storage path
- * 3. Edge Function downloads from storage
- * 4. Edge Function uploads to BirdNET (server-side FormData works!)
- * 5. Edge Function returns predictions
- * 
- * This bypasses React Native's FormData bug by using direct REST API calls
- * to Supabase Storage instead of the Supabase JS client (which uses FormData).
+ * 1. Upload M4A audio to local proxy (via ngrok)
+ * 2. Proxy converts M4A→WAV using ffmpeg
+ * 3. Proxy forwards WAV to BirdNET
+ * 4. Proxy returns predictions
  */
 
 import { supabase } from '../lib/supabase';
@@ -52,12 +48,10 @@ export class BirdNETDetectionModel {
       
       this.threshold = config.threshold;
       
-      console.log('🔧 BirdNET Model initialized (Supabase Storage Proxy)');
+      console.log('🔧 BirdNET Model initialized (Local Proxy)');
       console.log('🎯 Detection threshold:', this.threshold);
     } catch (error) {
       console.error('❌ BirdNET constructor failed:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error instanceof Error ? error.message : String(error));
       throw new Error(`BirdNET constructor failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -78,23 +72,13 @@ export class BirdNETDetectionModel {
       }
       
       console.log('  📦 Testing Supabase client import...');
-      try {
-        const { supabase } = await import('../lib/supabase');
-        console.log('  ✅ Supabase client imported successfully');
-      } catch (importError) {
-        console.error('  ❌ Supabase client import failed:', importError);
-        throw new Error(`Supabase client import failed: ${importError instanceof Error ? importError.message : String(importError)}`);
-      }
+      const { supabase } = await import('../lib/supabase');
+      console.log('  ✅ Supabase client imported successfully');
       
-      console.log('✅ BirdNET model ready (using Supabase Edge Function)');
+      console.log('✅ BirdNET model ready (using Local Proxy)');
       this.initialized = true;
     } catch (error) {
       console.error('❌ BirdNET initialize() failed:', error);
-      console.error('Error details:', {
-        type: typeof error,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : 'No stack'
-      });
       throw new Error(`BirdNET initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -107,7 +91,7 @@ export class BirdNETDetectionModel {
     const startTime = Date.now();
 
     try {
-      console.log('🔍 BirdNET Analysis Starting (via Supabase Storage)...');
+      console.log('🔍 BirdNET Analysis via Local Proxy...');
       console.log('  🎵 Audio URI:', audioUri);
 
       if (!audioUri || audioUri.trim() === '') {
@@ -121,113 +105,78 @@ export class BirdNETDetectionModel {
 
       console.log('  📦 File size:', fileInfo.size, 'bytes');
 
-      // Step 1: Upload to Supabase Storage
-      console.log('  📤 Step 1: Uploading to Supabase Storage...');
+      // Upload to local proxy via ngrok
+      console.log('  📤 Uploading to proxy...');
+      const response = await FileSystem.uploadAsync(
+        'https://pruinose-alise-uncooled.ngrok-free.dev/convert',
+        audioUri,
+        {
+          fieldName: 'audio',
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      console.log(`  📡 Response status: ${response.status}`);
       
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substring(7);
-      const extension = audioUri.endsWith('.m4a') ? 'm4a' : 'wav';
-      const filename = `temp/${timestamp}-${randomId}.${extension}`;
-
-      console.log('  📁 Uploading as:', filename);
-
-      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
-      const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey;
-
-      // Upload using FileSystem.uploadAsync (only method that works for binary in React Native)
-      const storageUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
-
-      const uploadResponse = await FileSystem.uploadAsync(storageUrl, audioUri, {
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': extension === 'm4a' ? 'audio/mp4' : 'audio/wav',
-        },
-      });
-
-      if (uploadResponse.status !== 200) {
-        throw new Error(`Storage upload failed: ${uploadResponse.body}`);
+      if (response.status !== 200) {
+        console.error('  ❌ Proxy error:', response.body);
+        throw new Error(`Proxy returned status ${response.status}: ${response.body}`);
       }
 
-      console.log('  ✅ Uploaded to storage:', filename);
+      const predictions = JSON.parse(response.body);
+      console.log('  🔍 BirdNET raw response:', JSON.stringify(predictions).substring(0, 500));
+      console.log(`  ✅ Analysis complete in ${duration}ms`);
 
-      // Step 2: Call Edge Function
-      console.log('  🔄 Step 2: Calling Edge Function...');
-
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
-      
-      const edgeResponse = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          storagePath: filename,
-          bucket: 'detections',
-        }),
-      });
-
-      console.log('  📡 Edge Function response status:', edgeResponse.status);
-
-      if (!edgeResponse.ok) {
-        const errorText = await edgeResponse.text();
-        console.error('  ❌ Edge Function error:', errorText);
-        
-        // Clean up storage file via REST API
-        const deleteUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
-        await fetch(deleteUrl, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-        });
-        
-        throw new Error(`Edge Function failed: ${errorText}`);
+      // Extract predictions array from response object
+      const predictionsList = predictions.predictions || [];
+      if (!Array.isArray(predictionsList)) {
+        throw new Error('Invalid response format from BirdNET');
       }
 
-      const result = await edgeResponse.json();
+      // Flatten species from all time segments
+      const allSpecies = predictionsList.flatMap(segment => segment.species || []);
+      console.log(`  📊 Raw detections: ${allSpecies.length}`);
 
-      // Step 3: Clean up temporary file
-      console.log('  🗑️  Step 3: Cleaning up temp file...');
-      const deleteUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
-      await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-        },
-      });
+      // Filter by threshold
+      const validPredictions = allSpecies.filter((p: any) => p.probability >= this.threshold);
+      console.log(`  🎯 Predictions above threshold (${this.threshold}): ${validPredictions.length}`);
 
-      try {
-        await FileSystem.deleteAsync(audioUri, { idempotent: true });
-      } catch (deleteError) {
-        console.warn('  ⚠️  Could not delete local file:', deleteError);
+      // Check for Swift Parrot
+      const swiftParrot = validPredictions.find((p: any) => 
+        p.species_name && p.species_name.toLowerCase().includes('lathamus')
+      );
+
+      const isPositive = !!swiftParrot;
+      const topPrediction = validPredictions[0];
+
+      console.log('  🦜 Swift Parrot detected:', isPositive ? 'YES' : 'NO');
+      if (topPrediction) {
+        console.log('  🏆 Top detection:', topPrediction.species_name, `(${(topPrediction.probability * 100).toFixed(1)}%)`);
       }
 
-      const elapsedTime = Date.now() - startTime;
-      console.log(`  ⏱️  Total analysis time: ${elapsedTime}ms`);
-      console.log('  ✅ BirdNET analysis complete');
-      
-      if (result.allDetections && result.allDetections.length > 0) {
-        console.log('  🏆 Top detection:', result.allDetections[0].species_name);
-        console.log('  🦜 Swift Parrot detected:', result.isPositive ? 'YES' : 'NO');
-      }
-
-      const allDetections = result.allDetections?.map((d: any) => ({
+      const allDetections = validPredictions.map((d: any) => ({
         species: d.species_name,
         common_name: d.species_name.split('_')[1] || d.species_name,
         scientific_name: d.species_name.split('_')[0] || '',
         confidence: d.probability,
-      })) || [];
+      }));
+
+      // Clean up local file
+      try {
+        await FileSystem.deleteAsync(audioUri, { idempotent: true });
+      } catch (deleteError) {
+        console.warn('  ⚠️ Could not delete local file:', deleteError);
+      }
 
       return {
-        confidence: result.confidence,
-        modelName: result.modelName,
-        isPositive: result.isPositive,
-        species: result.species,
-        commonName: result.species?.split('_')[1] || result.species,
-        scientificName: result.species?.split('_')[0] || '',
+        confidence: swiftParrot?.probability || topPrediction?.probability || 0,
+        modelName: 'BirdNET',
+        isPositive,
+        species: swiftParrot?.species_name || topPrediction?.species_name,
+        commonName: swiftParrot?.species_name?.split('_')[1] || topPrediction?.species_name?.split('_')[1],
+        scientificName: swiftParrot?.species_name?.split('_')[0] || topPrediction?.species_name?.split('_')[0],
         allDetections,
       };
 
