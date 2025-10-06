@@ -8,12 +8,13 @@
  * 4. Edge Function uploads to BirdNET (server-side FormData works!)
  * 5. Edge Function returns predictions
  * 
- * This bypasses React Native's FormData AND FileSystem.uploadAsync() bugs
- * by using proven Supabase Storage uploads.
+ * This bypasses React Native's FormData bug by using direct REST API calls
+ * to Supabase Storage instead of the Supabase JS client (which uses FormData).
  */
 
 import { supabase } from '../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
 
 export interface DetectionResult {
   confidence: number;
@@ -65,19 +66,17 @@ export class BirdNETDetectionModel {
     try {
       console.log('🔧 BirdNET model initializing...');
       
-      // Check environment variables
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+      const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey;
       
       console.log('  🔍 Environment check:');
       console.log('    Supabase URL present:', !!supabaseUrl);
       console.log('    Supabase Key present:', !!supabaseKey);
       
       if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Missing Supabase credentials in environment');
+        throw new Error('Missing Supabase credentials in app.json extra config');
       }
       
-      // Test Supabase client import
       console.log('  📦 Testing Supabase client import...');
       try {
         const { supabase } = await import('../lib/supabase');
@@ -100,12 +99,6 @@ export class BirdNETDetectionModel {
     }
   }
 
-  /**
-   * Analyze audio via Supabase Storage→Edge Function→BirdNET
-   * 
-   * @param audioUri - Local file URI of audio recording
-   * @returns Detection result with Swift Parrot identification
-   */
   async analyzeAudio(audioUri: string): Promise<DetectionResult> {
     if (!this.initialized) {
       throw new Error('Model not initialized. Call initialize() first.');
@@ -117,12 +110,10 @@ export class BirdNETDetectionModel {
       console.log('🔍 BirdNET Analysis Starting (via Supabase Storage)...');
       console.log('  🎵 Audio URI:', audioUri);
 
-      // Validate audio URI
       if (!audioUri || audioUri.trim() === '') {
         throw new Error('Audio URI is required');
       }
 
-      // Check file exists
       const fileInfo = await FileSystem.getInfoAsync(audioUri);
       if (!fileInfo.exists) {
         throw new Error(`Audio file not found: ${audioUri}`);
@@ -133,54 +124,47 @@ export class BirdNETDetectionModel {
       // Step 1: Upload to Supabase Storage
       console.log('  📤 Step 1: Uploading to Supabase Storage...');
       
-      // Read file as base64, then convert to Uint8Array
-      const base64Data = await FileSystem.readAsStringAsync(audioUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      // Convert base64 to binary
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      
-      // Generate unique filename
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
       const extension = audioUri.endsWith('.m4a') ? 'm4a' : 'wav';
       const filename = `temp/${timestamp}-${randomId}.${extension}`;
 
       console.log('  📁 Uploading as:', filename);
-      console.log('  📦 Binary size:', bytes.length, 'bytes');
 
-      // Upload to Supabase Storage using Uint8Array (works better than blob on React Native)
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('detections')
-        .upload(filename, bytes, {
-          contentType: extension === 'm4a' ? 'audio/mp4' : 'audio/wav',
-          upsert: false,
-        });
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+      const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey;
 
-      if (uploadError) {
-        throw new Error(`Storage upload failed: ${uploadError.message}`);
+      // Upload using FileSystem.uploadAsync (only method that works for binary in React Native)
+      const storageUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
+
+      const uploadResponse = await FileSystem.uploadAsync(storageUrl, audioUri, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': extension === 'm4a' ? 'audio/mp4' : 'audio/wav',
+        },
+      });
+
+      if (uploadResponse.status !== 200) {
+        throw new Error(`Storage upload failed: ${uploadResponse.body}`);
       }
 
-      console.log('  ✅ Uploaded to storage:', uploadData.path);
+      console.log('  ✅ Uploaded to storage:', filename);
 
-      // Step 2: Call Edge Function with storage path
+      // Step 2: Call Edge Function
       console.log('  🔄 Step 2: Calling Edge Function...');
 
-      const edgeFunctionUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-birdcall`;
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/analyze-birdcall`;
       
       const edgeResponse = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          storagePath: uploadData.path,
+          storagePath: filename,
           bucket: 'detections',
         }),
       });
@@ -191,8 +175,14 @@ export class BirdNETDetectionModel {
         const errorText = await edgeResponse.text();
         console.error('  ❌ Edge Function error:', errorText);
         
-        // Clean up storage file
-        await supabase.storage.from('detections').remove([uploadData.path]);
+        // Clean up storage file via REST API
+        const deleteUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
+        await fetch(deleteUrl, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+        });
         
         throw new Error(`Edge Function failed: ${errorText}`);
       }
@@ -201,9 +191,14 @@ export class BirdNETDetectionModel {
 
       // Step 3: Clean up temporary file
       console.log('  🗑️  Step 3: Cleaning up temp file...');
-      await supabase.storage.from('detections').remove([uploadData.path]);
+      const deleteUrl = `${supabaseUrl}/storage/v1/object/detections/${filename}`;
+      await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
 
-      // Clean up local file
       try {
         await FileSystem.deleteAsync(audioUri, { idempotent: true });
       } catch (deleteError) {
@@ -219,7 +214,6 @@ export class BirdNETDetectionModel {
         console.log('  🦜 Swift Parrot detected:', result.isPositive ? 'YES' : 'NO');
       }
 
-      // Transform Edge Function response to our format
       const allDetections = result.allDetections?.map((d: any) => ({
         species: d.species_name,
         common_name: d.species_name.split('_')[1] || d.species_name,
@@ -242,7 +236,6 @@ export class BirdNETDetectionModel {
       console.error(`❌ BirdNET analysis failed after ${elapsedTime}ms`);
       console.error('Error details:', error);
 
-      // Clean up local file even on error
       try {
         await FileSystem.deleteAsync(audioUri, { idempotent: true });
       } catch (deleteError) {

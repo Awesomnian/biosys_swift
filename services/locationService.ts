@@ -12,15 +12,11 @@ export class LocationService {
   private permissionGranted: boolean = false;
 
   async requestPermission(): Promise<boolean> {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      this.permissionGranted = status === 'granted';
-      return this.permissionGranted;
-    } catch (error) {
-      console.error('Error requesting location permission:', error);
-      return false;
-    }
-  }
+  // Permission API hangs - manually granted in Android settings
+  console.log('Location permission assumed (manually granted)');
+  this.permissionGranted = true;
+  return true;
+}
 
   async getCurrentLocation(): Promise<LocationData | null> {
     if (!this.permissionGranted) {

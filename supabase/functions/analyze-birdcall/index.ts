@@ -47,7 +47,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // BirdNET server URL
     const birdnetUrl = "https://pruinose-alise-uncooled.ngrok-free.dev";
     console.log(`Using BirdNET server at: ${birdnetUrl}`);
 
@@ -56,15 +55,11 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "Method not allowed. Use POST." }),
         {
           status: 405,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    // Parse request body to get storage path
     const { storagePath, bucket } = await req.json();
 
     if (!storagePath) {
@@ -72,22 +67,17 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "No storage path provided" }),
         {
           status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    console.log(`Downloading audio from Supabase Storage: ${bucket || 'detections'}/${storagePath}`);
+    console.log(`Downloading audio from: ${bucket || 'detections'}/${storagePath}`);
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Download audio file from Supabase Storage
     const { data: audioData, error: downloadError } = await supabase.storage
       .from(bucket || 'detections')
       .download(storagePath);
@@ -96,15 +86,64 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to download audio: ${downloadError?.message}`);
     }
 
-    console.log(`Downloaded audio file: ${audioData.size} bytes`);
+    console.log(`Downloaded ${storagePath}: ${audioData.size} bytes`);
 
-    // Create FormData for BirdNET
+    let audioToSend: Blob;
+    let filename: string;
+
+    if (storagePath.endsWith('.m4a')) {
+      console.log('Converting M4A to WAV using ffmpeg...');
+      
+      try {
+        // Write M4A to temp file
+        const tempDir = await Deno.makeTempDir();
+        const inputPath = `${tempDir}/input.m4a`;
+        const outputPath = `${tempDir}/output.wav`;
+        
+        const audioBuffer = await audioData.arrayBuffer();
+        await Deno.writeFile(inputPath, new Uint8Array(audioBuffer));
+        
+        // Run ffmpeg conversion
+        const command = new Deno.Command("ffmpeg", {
+          args: [
+            "-i", inputPath,
+            "-acodec", "pcm_s16le",
+            "-ar", "48000",
+            "-ac", "1",
+            outputPath
+          ],
+        });
+        
+        const { code, stderr } = await command.output();
+        
+        if (code !== 0) {
+          const errorText = new TextDecoder().decode(stderr);
+          throw new Error(`ffmpeg failed: ${errorText}`);
+        }
+        
+        // Read converted WAV
+        const wavData = await Deno.readFile(outputPath);
+        audioToSend = new Blob([wavData], { type: 'audio/wav' });
+        filename = storagePath.replace('.m4a', '.wav');
+        
+        // Cleanup
+        await Deno.remove(tempDir, { recursive: true });
+        
+        console.log(`Converted to WAV: ${audioToSend.size} bytes`);
+      } catch (conversionError) {
+        console.error('FFmpeg conversion failed:', conversionError);
+        throw new Error(`Audio conversion failed: ${conversionError.message}`);
+      }
+    } else {
+      audioToSend = audioData;
+      filename = storagePath;
+    }
+
     const birdnetFormData = new FormData();
-    birdnetFormData.append("file", audioData, storagePath);
+    birdnetFormData.append("file", audioToSend, filename);
 
     console.log('Sending to BirdNET...');
 
-    // Send to BirdNET server
     const birdnetResponse = await fetch(`${birdnetUrl}/inference/`, {
       method: "POST",
       headers: {
@@ -121,7 +160,6 @@ Deno.serve(async (req: Request) => {
     const birdnetData: BirdNETResponse = await birdnetResponse.json();
     console.log(`BirdNET returned ${birdnetData.predictions.length} time segments`);
 
-    // Flatten predictions
     const allDetections: DetectionResult[] = [];
     for (const segment of birdnetData.predictions) {
       for (const speciesDetection of segment.species) {
@@ -134,7 +172,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Find Swift Parrot detections
     const swiftParrotNames = [
       "Lathamus discolor",
       "Swift Parrot",
@@ -161,14 +198,11 @@ Deno.serve(async (req: Request) => {
       allDetections: allDetections.slice(0, 10),
     };
 
-    console.log(`Analysis complete. Swift Parrot: ${swiftParrotDetection ? 'YES' : 'NO'}, confidence: ${confidence.toFixed(3)}`);
+    console.log(`Analysis complete. Swift Parrot: ${isPositive ? 'YES' : 'NO'}, confidence: ${confidence.toFixed(3)}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Error analyzing audio:", error);
@@ -182,10 +216,7 @@ Deno.serve(async (req: Request) => {
       }),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }

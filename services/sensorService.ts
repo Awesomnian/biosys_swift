@@ -162,19 +162,10 @@ export class SensorService {
       await this.storageService.initialize();
       console.log('  ✅ Step 2 complete: Storage initialized');
 
-      // Step 3: Request location permission (with timeout)
-      console.log('  📦 Step 3: Requesting location permission (5s timeout)...');
-      try {
-        const permissionPromise = this.locationService.requestPermission();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Location permission timeout')), 5000)
-        );
-        
-        await Promise.race([permissionPromise, timeoutPromise]);
-        console.log('  ✅ Step 3 complete: Location permission granted');
-      } catch (error) {
-        console.warn('  ⚠️ Step 3: Location permission failed (continuing anyway):', error instanceof Error ? error.message : String(error));
-      }
+      // Step 3: Assume location permission (manually granted in Android settings)
+console.log('  📦 Step 3: Assuming location permission...');
+this.locationService.requestPermission();
+console.log('  ✅ Step 3 complete: Location permission assumed');
 
       // Step 4: Update stats
       console.log('  📦 Step 4: Updating stats...');
@@ -217,21 +208,14 @@ export class SensorService {
     this.stats.lastError = undefined;
     console.log('  ✅ Error counters reset');
 
-    // Start GPS tracking (with timeout)
-    console.log('  📍 Step 1: Starting GPS tracking (5s timeout)...');
-    try {
-      const gpsPromise = this.locationService.startTracking();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('GPS tracking timeout')), 5000)
-      );
-      
-      await Promise.race([gpsPromise, timeoutPromise]);
-      console.log('  ✅ GPS tracking started');
-    } catch (gpsError) {
-      console.warn('  ⚠️ GPS tracking failed (continuing without live GPS):', gpsError instanceof Error ? gpsError.message : String(gpsError));
-      // Continue anyway - we have fallback coordinates
-    }
-
+// Start GPS tracking (no timeout - permission manually granted)
+console.log('  📍 Step 1: Starting GPS tracking...');
+try {
+  await this.locationService.startTracking();
+  console.log('  ✅ GPS tracking started');
+} catch (gpsError) {
+  console.warn('  ⚠️ GPS tracking failed:', gpsError);
+}
     // Start audio capture
     console.log('  🎤 Step 2: Starting audio capture...');
     try {

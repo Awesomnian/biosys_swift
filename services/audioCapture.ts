@@ -1,12 +1,8 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 
-/**
- * Audio segment captured from microphone
- * Changed from blob to uri for FileSystem.uploadAsync() compatibility
- */
 export interface AudioSegment {
-  uri: string;  // Changed from blob: Blob - now returns file URI for direct upload
+  uri: string;
   timestamp: Date;
   duration: number;
 }
@@ -14,8 +10,8 @@ export interface AudioSegment {
 /**
  * Audio Capture Service
  * 
- * Continuously records 5-second audio segments in WAV format for BirdNET analysis.
- * Uses WAV format (BirdNET's preferred format) instead of .m4a for better compatibility.
+ * Records 5-second audio segments in M4A format.
+ * M4A is converted to WAV server-side before BirdNET analysis.
  */
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
@@ -42,47 +38,26 @@ export class AudioCaptureService {
     }
 
     try {
-      console.log('  🔧 Step 1: Requesting microphone permission (5s timeout)...');
-      
-      const permissionPromise = Audio.requestPermissionsAsync();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Microphone permission timeout')), 5000)
-      );
-      
-      const permission = await Promise.race([permissionPromise, timeoutPromise]) as any;
-      
-      console.log('  📊 Permission result:', {
-        granted: permission?.granted,
-        canAskAgain: permission?.canAskAgain,
-        status: permission?.status
-      });
-      
-      if (!permission || !permission.granted) {
-        console.error('  ❌ Microphone permission DENIED or TIMEOUT');
-        throw new Error('Microphone permission not granted');
-      }
-      console.log('  ✅ Microphone permission granted');
+      console.log('  ✅ Microphone permission assumed (manually granted)');
 
-      console.log('  🔧 Step 2: Setting audio mode...');
+      console.log('  🔧 Setting audio mode...');
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
       console.log('  ✅ Audio mode set');
 
-      console.log('  🔧 Step 3: Setting isRecording = true...');
+      console.log('  🔧 Setting isRecording = true...');
       this.isRecording = true;
       console.log('  ✅ isRecording set');
 
-      console.log('  🔧 Step 4: Starting first audio segment...');
+      console.log('  🔧 Starting first audio segment...');
       await this.startNewSegment();
       console.log('  ✅ First segment started');
       
       console.log('✅ AudioCaptureService.start() COMPLETE');
     } catch (error) {
       console.error('❌ AudioCaptureService.start() FAILED:', error);
-      console.error('  Error type:', typeof error);
-      console.error('  Error message:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -95,14 +70,13 @@ export class AudioCaptureService {
     try {
       const segmentStartTime = Date.now();
 
-      // Record audio in M4A format - more reliable on Android
-      // BirdNET can process M4A/AAC files
+      // Record in M4A - converted to WAV server-side
       const { recording } = await Audio.Recording.createAsync({
         android: {
           extension: '.m4a',
           outputFormat: Audio.AndroidOutputFormat.MPEG_4,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 44100,
+          sampleRate: 48000,
           numberOfChannels: 1,
           bitRate: 128000,
         },
@@ -110,12 +84,9 @@ export class AudioCaptureService {
           extension: '.m4a',
           outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
           audioQuality: Audio.IOSAudioQuality.HIGH,
-          sampleRate: 44100,
+          sampleRate: 48000,
           numberOfChannels: 1,
           bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
         },
         web: {
           mimeType: 'audio/webm',
@@ -138,16 +109,11 @@ export class AudioCaptureService {
               if (fileInfo.exists) {
                 const duration = Date.now() - segmentStartTime;
 
-                // Pass file URI directly - no blob conversion needed
-                // FileSystem.uploadAsync() works with file URIs
                 this.onSegmentReady({
                   uri,
                   timestamp: new Date(segmentStartTime),
                   duration,
                 });
-
-                // Note: File will be deleted by detection service after upload
-                // Don't delete here to ensure FileSystem.uploadAsync() can access it
               }
             }
 
