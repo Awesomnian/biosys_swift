@@ -4,17 +4,53 @@ A React Native mobile app for detecting Swift Parrot calls using BirdNET ML anal
 
 ---
 
-## Current Status (2025-10-07)
-App functioning, synchronisation with BirdNET for identification, upload of positive identification of Swift Parrot or Orange-bellied parrots (confidence > 80%) now uploading to Supabase and displaying in-app to user. Lat/Long, Date/Time, UniqueID and associated Positive Audio recordings saved locally and to Supabase.
+## Project Status
 
-Mapping next. Bed first.
+- Audio recording, BirdNET ML analysis, and species detection are functional.
+- Detections (confidence > 80% for Swift Parrot or Orange-bellied Parrot) are uploaded to Supabase and displayed in-app.
+- GPS tagging and timestamping are operational, though filtering and confidence display in Supabase are still in progress.
+- Mapping is planned next.
 
-## What It Should Do
+---
 
-1. Record audio continuously (5-second segments)
-2. Get GPS coordinates for each recording
-3. Analyze audio with BirdNET to detect Swift Parrots
-4. Store detections with audio + GPS + timestamp
+## Features
+
+- Continuous audio recording (5-second segments)
+- GPS coordinates for each recording
+- BirdNET ML analysis for Swift Parrot detection
+- Storage of detections with audio, GPS, and timestamp
+- Automated upload to Supabase
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- Docker (for BirdNET)
+- ngrok (for BirdNET API tunnel)
+- Android phone with USB debugging OR Expo Go app
+- Internet
+- Computer
+
+### Setup
+
+1. Clone this repo:
+    ```bash
+    git clone https://github.com/Awesomnian/biosys_swift.git
+    cd biosys_swift
+    ```
+2. Install dependencies:
+    ```bash
+    npm install
+    ```
+3. Start the app (Expo Go recommended for quick testing):
+    ```bash
+    npm start
+    ```
+4. Ensure BirdNET server is running (see `scripts/` and Docker instructions).
+5. Connect your Android device or use Expo Go for preview.
 
 ---
 
@@ -26,40 +62,26 @@ Mobile App → Supabase Storage → Edge Function → BirdNET Docker → Results
 
 ---
 
-## Quick Start
-
-### Prerequisites - Inverse Order of Priority
-
-- Node.js 18+
-- Docker (for BirdNET)
-- ngrok (for BirdNET API tunnel)
-- Android phone with USB debugging OR Expo Go app
-- Internet
-- Computer
-- Pulse
-
----
-
-
 ## Known Issues
 
-1. Manual Synch button in-app doesn't work (currently fully automated for testing) so no "offline/field mode" for upload later.
-2. Lat/Long not displaying for filtering in database, although it is being captured. Displaying on-App.
-3. Confidence level not displaying in Supabase for display or filtering. It is being captured and is being displayed in-app.
-4. I really don't like what you've done with your hair. It's fine. I'm just saying that I liked it better before.
+- Manual sync button does not work yet (upload is automated for testing)
+- Lat/Long and confidence levels are captured but not fully displayed or filterable in Supabase
+- Offline/field mode upload is not implemented
 
 ---
 
-## Documentation
+## Contributing
 
-- **Repo hygiene:** aka "Dumping It All In /docs" completed. Most is out of date or wrong, will be culled brutally and in front of other docs in order to sow fear and obedience.
+Pull requests and suggestions are welcome! Please open issues for bugs or features.
+
+---
+
+## License
+
+MIT
 
 ---
 
 ## Repository
 
 https://github.com/Awesomnian/biosys_swift
-
----
-
-
