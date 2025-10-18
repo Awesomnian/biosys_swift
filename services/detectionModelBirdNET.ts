@@ -119,7 +119,7 @@ export class BirdNETDetectionModel {
           console.log(`  🔎 Trying endpoint: ${endpoint}`);
           try {
             response = await FileSystem.uploadAsync(endpoint, audioUri, {
-              fieldName: 'file',
+              fieldName: 'audio',
               httpMethod: 'POST',
               uploadType: FileSystem.FileSystemUploadType.MULTIPART,
             });
