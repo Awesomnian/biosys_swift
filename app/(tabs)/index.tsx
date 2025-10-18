@@ -39,6 +39,7 @@ function MobileMonitorScreen() {
 
   useEffect(() => {
     initializeSensor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ function MobileMonitorScreen() {
     if (!stats.isRunning && isStopping) {
       setIsStopping(false);
     }
-  }, [stats.isRunning]);
+  }, [stats.isRunning, isStarting, isStopping]);
 
   const initializeSensor = async () => {
     let currentStep = 'Starting';
@@ -179,7 +180,7 @@ function MobileMonitorScreen() {
       setIsStarting(true);
       try {
         await sensorServiceRef.current.start();
-      } catch (error: unknown) {
+      } catch {
         alert('Failed to start audio capture. Please grant microphone permissions.');
         setIsStarting(false);
       }

@@ -9,9 +9,12 @@ export interface AudioSegment {
 
 /**
  * Audio Capture Service
- * 
+ *
  * Records 5-second audio segments in M4A format.
  * Files saved to persistent storage for later processing.
+ *
+ * NOTE: M4A format used because BirdNET proxy handles conversion to WAV.
+ * This approach avoids heavy client-side audio processing on mobile devices.
  */
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
