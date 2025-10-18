@@ -1,9 +1,11 @@
 import { supabase, Detection } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+// Prefer expo constants (app.json extra) for runtime config; fall back to process.env
+const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 interface PendingDetection {
   id: string;
@@ -91,8 +93,15 @@ export class StorageService {
     console.log('  📦 File size:', fileInfo.size, 'bytes');
 
     const fileName = `${detection.metadata.device_id}/${detection.id}.m4a`;
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/detections/${fileName}`;
-    
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('  ❌ Supabase URL or ANON key missing. Cannot upload file now. Will retry later.');
+      // Leave detection in queue for retry
+      return;
+    }
+
+    const uploadUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/detections/${fileName}`;
+
     console.log('  ☁️ Uploading to:', uploadUrl);
 
     const response = await FileSystem.uploadAsync(uploadUrl, detection.audioUri, {
@@ -105,7 +114,7 @@ export class StorageService {
       },
     });
 
-    if (response.status !== 200) {
+    if (response.status < 200 || response.status >= 300) {
       console.error('  ❌ Upload failed:', response.status, response.body);
       throw new Error(`Upload failed: ${response.status}`);
     }
@@ -115,6 +124,11 @@ export class StorageService {
     await FileSystem.deleteAsync(detection.audioUri, { idempotent: true });
     console.log('  🗑️ Local file deleted after successful upload');
 
+    if (!supabase) {
+      console.warn('Supabase client not initialized; skipping DB save');
+      return;
+    }
+
     const { data: urlData } = supabase.storage
       .from('detections')
       .getPublicUrl(fileName);
@@ -122,12 +136,13 @@ export class StorageService {
     console.log('  🔗 Public URL:', urlData.publicUrl);
 
     console.log('  💾 Saving to database...');
+    // Cast to any to avoid strict PostgREST typing issues in this small POC
     const { error: dbError } = await supabase
       .from('detections')
       .insert({
         ...detection.metadata,
         audio_file_url: urlData.publicUrl,
-      });
+      } as any);
 
     if (dbError) {
       console.error('  ❌ Database error:', dbError);
@@ -135,6 +150,36 @@ export class StorageService {
     }
 
     console.log('  ✅ Detection saved successfully! 🎉');
+
+    // Trigger server-side analysis via Supabase Edge Function if configured.
+    try {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+        const functionUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/analyze-birdcall`;
+        console.log('  🔁 Triggering Edge Function for analysis:', functionUrl);
+
+        const res = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ storagePath: fileName, bucket: 'detections' }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          console.warn('  ⚠️ Edge function returned non-OK status:', res.status, text);
+        } else {
+          const json = await res.json().catch(() => null);
+          console.log('  ✅ Edge function analysis queued/returned:', json);
+        }
+      } else {
+        console.warn('  ⚠️ Supabase config missing; cannot trigger Edge Function for analysis');
+      }
+    } catch (err) {
+      console.error('  ❌ Failed to call Edge Function:', err);
+    }
   }
 
   async cleanupOldFiles(): Promise<void> {

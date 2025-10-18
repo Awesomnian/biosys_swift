@@ -85,3 +85,31 @@ MIT
 ## Repository
 
 https://github.com/Awesomnian/biosys_swift
+
+---
+
+## Configuration (app.json / EAS secrets)
+
+The app expects a few runtime configuration values to be provided via `app.json` `extra` or via EAS secrets for production builds:
+
+- `supabaseUrl` — your Supabase project URL (e.g. `https://xyz.supabase.co`).
+- `supabaseAnonKey` — the public anon key (or use EAS secrets to inject this at build/runtime).
+- `birdnetUrl` — the BirdNET server base URL (eg an ngrok forwarding URL or a hosted BirdNET instance).
+
+For local development, copy `app.example.json` to `app.json` and fill in the values. For CI and production, prefer EAS secrets so you do not commit keys.
+
+Example (local):
+
+```json
+{
+    "expo": {
+        "extra": {
+            "supabaseUrl": "https://your-project.supabase.co",
+            "supabaseAnonKey": "public-anon-key-or-eas-secret",
+            "birdnetUrl": "https://your-ngrok-or-birdnet-host"
+        }
+    }
+}
+```
+
+If `extra` values are not provided, the app will warn on startup and some features will be disabled until configured.

@@ -31,12 +31,17 @@ function MobileDetectionsScreen() {
   const fetchDetections = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+  if (!supabase) {
+    console.warn('Supabase client not initialized; skipping fetchDetections');
+    setDetections([]);
+    return;
+  }
+
+  const { data, error } = await supabase
         .from('detections')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(50);
-
       if (error) throw error;
       setDetections(data || []);
     } catch (error) {
@@ -65,9 +70,8 @@ function MobileDetectionsScreen() {
             {new Date(item.timestamp).toLocaleString()}
           </Text>
         </View>
-
         {item.latitude && item.longitude && (
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, styles.locationRow]}>
             <MapPin size={16} color="#9ca3af" />
             <Text style={styles.infoText}>
               {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
@@ -102,7 +106,7 @@ function MobileDetectionsScreen() {
       <FlatList
         data={detections}
         renderItem={renderDetection}
-        keyExtractor={(item) => item.id || ''}
+        keyExtractor={(item) => item.id ?? `${item.timestamp}-${item.device_id}`}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
@@ -166,11 +170,14 @@ const styles = StyleSheet.create({
   confidenceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: '#10b98120',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+  },
+
+  locationRow: {
+    marginTop: 8,
   },
   confidenceText: {
     fontSize: 14,
@@ -182,13 +189,13 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   detectionInfo: {
-    gap: 8,
     marginBottom: 12,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    // React Native doesn't support 'gap' consistently; use spacing on children instead
+    columnGap: 8,
   },
   infoText: {
     fontSize: 14,
@@ -236,7 +243,8 @@ const styles = StyleSheet.create({
   webContent: {
     maxWidth: 500,
     alignItems: 'center',
-    gap: 20,
+    // avoid gap for cross-platform compatibility
+    paddingVertical: 20,
   },
   webTitle: {
     fontSize: 28,

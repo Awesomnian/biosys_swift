@@ -1,17 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
+// Make supabase client resilient at import time so the app doesn't throw during builds
+// if `expoConfig.extra` isn't populated (e.g. in some CI or web builds).
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase credentials in app.json extra config');
-  console.error('   Expected: Constants.expoConfig.extra.supabaseUrl');
-  console.error('   Expected: Constants.expoConfig.extra.supabaseAnonKey');
-  throw new Error('Supabase credentials not configured in app.json');
+let _supabaseClient: ReturnType<typeof createClient> | null = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    _supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  } catch (err) {
+    console.error('Failed to create Supabase client:', err);
+    _supabaseClient = null;
+  }
+} else {
+  console.warn('Supabase credentials not found in Constants.expoConfig.extra. Supabase client not initialized.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = _supabaseClient as ReturnType<typeof createClient> | null;
 
 export interface Detection {
   id?: string;

@@ -47,8 +47,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const birdnetUrl = "https://pruinose-alise-uncooled.ngrok-free.dev";
-    console.log(`Using BirdNET server at: ${birdnetUrl}`);
+  const birdnetUrl = "https://pruinose-alise-uncooled.ngrok-free.dev";
+  console.log(`Using BirdNET server at: ${birdnetUrl}`);
 
     if (req.method !== "POST") {
       return new Response(
@@ -144,21 +144,63 @@ Deno.serve(async (req: Request) => {
 
     console.log('Sending to BirdNET...');
 
-    const birdnetResponse = await fetch(`${birdnetUrl}/inference/`, {
-      method: "POST",
-      headers: {
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: birdnetFormData,
-    });
+    // Try multiple likely endpoints and follow redirects; log full responses to help debugging
+    const candidatePaths = ['/inference/', '/inference', '/predict', '/analyze', '/convert', '/'];
+    let birdnetResponse: Response | null = null;
+    let birdnetEndpointUsed: string | null = null;
 
-    if (!birdnetResponse.ok) {
-      const errorText = await birdnetResponse.text();
-      throw new Error(`BirdNET server returned ${birdnetResponse.status}: ${errorText}`);
+    for (const p of candidatePaths) {
+      const endpoint = `${birdnetUrl.replace(/\/$/, '')}${p}`;
+      console.log(`Attempting BirdNET endpoint: ${endpoint}`);
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          // allow ngrok warning bypass if needed
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: birdnetFormData,
+        });
+
+        console.log(`BirdNET responded ${res.status} for ${endpoint}`);
+
+        const text = await res.text().catch(() => '');
+        // Try to parse JSON if possible
+        let jsonBody: any = null;
+        try { jsonBody = JSON.parse(text); } catch (_) { jsonBody = text; }
+        console.log('BirdNET response body (truncated):', typeof jsonBody === 'string' ? jsonBody.substring(0, 1000) : JSON.stringify(jsonBody).substring(0,1000));
+
+        if (res.ok) {
+          birdnetResponse = res;
+          birdnetEndpointUsed = endpoint;
+          // re-create a Response from the parsed text so we can json() below
+          // (we already have the body string in `text`)
+          birdnetResponse = new Response(text, { status: res.status, headers: res.headers });
+          break;
+        }
+
+        // If 404, try next candidate
+        if (res.status === 404) {
+          console.warn(`BirdNET returned 404 for ${endpoint}; trying next candidate`);
+          continue;
+        }
+
+        // For 5xx or other non-OK statuses, log and try next candidate — but capture for error reporting
+        console.warn(`BirdNET returned non-OK status ${res.status} for ${endpoint}`);
+        // continue to try other endpoints
+      } catch (err) {
+        console.warn(`Network error calling BirdNET at ${endpoint}:`, err);
+        // try next endpoint
+      }
     }
 
+    if (!birdnetResponse) {
+      throw new Error('All BirdNET endpoint attempts failed or returned non-OK statuses; see logs for details');
+    }
+
+    // Parse JSON from the successful response
     const birdnetData: BirdNETResponse = await birdnetResponse.json();
-    console.log(`BirdNET returned ${birdnetData.predictions.length} time segments`);
+    console.log(`BirdNET returned ${birdnetData.predictions.length} time segments (from ${birdnetEndpointUsed})`);
 
     const allDetections: DetectionResult[] = [];
     for (const segment of birdnetData.predictions) {

@@ -6,7 +6,7 @@
  * - Orange-bellied Parrot (Neophema chrysogaster)
  */
 
-import { supabase } from '../lib/supabase';
+// supabase client is not needed directly in this module; import lazily where required
 import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 
@@ -17,12 +17,12 @@ export interface DetectionResult {
   species?: string;
   commonName?: string;
   scientificName?: string;
-  allDetections?: Array<{
+  allDetections?: {
     species: string;
     common_name: string;
     scientific_name: string;
     confidence: number;
-  }>;
+  }[];
 }
 
 export interface BirdNETConfig {
@@ -60,19 +60,23 @@ export class BirdNETDetectionModel {
       
       const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
       const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey;
-      
+
       console.log('  🔍 Environment check:');
       console.log('    Supabase URL present:', !!supabaseUrl);
       console.log('    Supabase Key present:', !!supabaseKey);
-      
+
       if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Missing Supabase credentials in app.json extra config');
+        console.warn('  ⚠️ Supabase credentials not found in app config. Continuing without a runtime Supabase client check. Upload/DB operations may fail later if Supabase is not configured.');
+      } else {
+        try {
+          console.log('  📦 Testing Supabase client import...');
+          await import('../lib/supabase');
+          console.log('  ✅ Supabase client imported successfully');
+        } catch (impErr) {
+          console.warn('  ⚠️ Supabase client import failed, continuing. Error:', impErr);
+        }
       }
-      
-      console.log('  📦 Testing Supabase client import...');
-      const { supabase } = await import('../lib/supabase');
-      console.log('  ✅ Supabase client imported successfully');
-      
+
       console.log('✅ BirdNET model ready (using Local Proxy)');
       this.initialized = true;
     } catch (error) {
@@ -103,21 +107,53 @@ export class BirdNETDetectionModel {
 
       console.log('  📦 File size:', fileInfo.size, 'bytes');
 
-      console.log('  📤 Uploading to proxy...');
-      const response = await FileSystem.uploadAsync(
-        'https://pruinose-alise-uncooled.ngrok-free.dev/convert',
-        audioUri,
-        {
-          fieldName: 'audio',
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        console.log('  ⚓ Uploading to proxy...');
+        const birdnetBase = Constants.expoConfig?.extra?.birdnetUrl || 'https://pruinose-alise-uncooled.ngrok-free.dev';
+        const candidatePaths = ['/convert', '/analyze', '/predict', '/inference', '/'];
+
+        let response: any = null;
+        let usedEndpoint: string | null = null;
+
+        for (const p of candidatePaths) {
+          const endpoint = `${birdnetBase.replace(/\/$/, '')}${p}`;
+          console.log(`  🔎 Trying endpoint: ${endpoint}`);
+          try {
+            response = await FileSystem.uploadAsync(endpoint, audioUri, {
+              fieldName: 'file',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            });
+
+            console.log(`  ℹ️ Received status ${response.status} from ${endpoint}`);
+
+            // Accept 200-299 as success; treat 404 as endpoint mismatch and try next
+            if (response.status >= 200 && response.status < 300) {
+              usedEndpoint = endpoint;
+              break;
+            } else if (response.status === 404) {
+              console.warn(`  ⚠️ 404 from ${endpoint}, trying next candidate`);
+              // try next
+            } else {
+              // For other status codes, log and break to surface error
+              console.error(`  ❌ Unexpected status ${response.status} from ${endpoint}: ${response.body}`);
+              usedEndpoint = endpoint;
+              break;
+            }
+          } catch (err) {
+            console.warn(`  ⚠️ Network/Upload error to ${endpoint}:`, err instanceof Error ? err.message : String(err));
+            // try next endpoint
+            response = null;
+          }
         }
-      );
+
+        if (!response) {
+          throw new Error(`Failed to upload to BirdNET proxy - no successful endpoint found (tried ${candidatePaths.join(', ')})`);
+        }
 
       const duration = Date.now() - startTime;
       console.log(`  📡 Response status: ${response.status}`);
       
-      if (response.status !== 200) {
+      if (response.status < 200 || response.status >= 300) {
         console.error('  ❌ Proxy error:', response.body);
         throw new Error(`Proxy returned status ${response.status}: ${response.body}`);
       }

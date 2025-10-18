@@ -199,7 +199,33 @@ export class SensorService {
         if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to fetch')) {
           this.stats.lastError = 'BirdNET server unreachable. Check server configuration.';
         } else {
-          this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
+          // If BirdNET proxy returned a format error (e.g. 500 "Format not recognised."),
+          // preserve the audio and queue it for deferred server-side analysis via StorageService.
+          if (errorMessage.toLowerCase().includes('format not recognised') || errorMessage.toLowerCase().includes('format not recognized') || errorMessage.toLowerCase().includes('proxy returned status 500')) {
+            try {
+              console.warn('BirdNET format error detected — deferring analysis by saving audio for server-side processing');
+              const location = await this.locationService.getCurrentLocation();
+              const metadata = {
+                device_id: this.config.deviceId,
+                timestamp: new Date().toISOString(),
+                latitude: location?.latitude || this.config.latitude,
+                longitude: location?.longitude || this.config.longitude,
+                model_name: 'BirdNET-Deferred',
+                confidence: 0,
+              } as any;
+
+              await this.storageService.saveDetection(segment.uri, metadata);
+              this.stats.lastError = 'Analysis deferred to server due to audio format mismatch. Audio queued for upload.';
+              this.lastErrorTime = now;
+              this.updateStats();
+              return; // do not delete the file here — storageService will handle cleanup after upload
+            } catch (saveErr) {
+              console.error('Failed to defer analysis and save audio:', saveErr);
+              this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
+            }
+          } else {
+            this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
+          }
         }
 
         console.error('Error processing audio segment:', error);
@@ -207,7 +233,13 @@ export class SensorService {
         this.updateStats();
       }
       
-      await FileSystem.deleteAsync(segment.uri, { idempotent: true });
+      // Delete the audio segment unless we've already deferred it to storageService above.
+      try {
+        await FileSystem.deleteAsync(segment.uri, { idempotent: true });
+        console.log('\ud83d\uddd1\ufe0f Deleted temporary audio segment');
+      } catch (delErr) {
+        console.warn('Failed to delete temporary audio segment:', delErr);
+      }
     }
   }
 
