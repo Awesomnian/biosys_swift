@@ -9,21 +9,7 @@
 // supabase client is not needed directly in this module; import lazily where required
 import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
-
-export interface DetectionResult {
-  confidence: number;
-  modelName: string;
-  isPositive: boolean;
-  species?: string;
-  commonName?: string;
-  scientificName?: string;
-  allDetections?: {
-    species: string;
-    common_name: string;
-    scientific_name: string;
-    confidence: number;
-  }[];
-}
+import { DetectionResult, DetectionModel } from './detectionModel';
 
 export interface BirdNETConfig {
   threshold: number;
@@ -31,9 +17,11 @@ export interface BirdNETConfig {
   supabaseAnonKey?: string;
 }
 
-export class BirdNETDetectionModel {
+export class BirdNETDetectionModel implements DetectionModel {
   private threshold: number;
   private initialized: boolean = false;
+  private latitude?: number;
+  private longitude?: number;
 
   constructor(config: BirdNETConfig) {
     try {
@@ -111,11 +99,16 @@ export class BirdNETDetectionModel {
         const birdnetBase = Constants.expoConfig?.extra?.birdnetUrl || 'https://pruinose-alise-uncooled.ngrok-free.dev';
         const candidatePaths = ['/convert', '/analyze', '/predict', '/inference', '/'];
 
+        // Build location query params if available
+        const locationParams = (this.latitude !== undefined && this.longitude !== undefined)
+          ? `?lat=${this.latitude}&lon=${this.longitude}`
+          : '';
+
         let response: any = null;
         let usedEndpoint: string | null = null;
 
         for (const p of candidatePaths) {
-          const endpoint = `${birdnetBase.replace(/\/$/, '')}${p}`;
+          const endpoint = `${birdnetBase.replace(/\/$/, '')}${p}${locationParams}`;
           console.log(`  🔎 Trying endpoint: ${endpoint}`);
           try {
             response = await FileSystem.uploadAsync(endpoint, audioUri, {
@@ -225,6 +218,12 @@ export class BirdNETDetectionModel {
   setThreshold(threshold: number): void {
     this.threshold = Math.min(1.0, Math.max(0.0, threshold));
     console.log(`🎯 BirdNET detection threshold updated to ${this.threshold}`);
+  }
+
+  setLocation(latitude: number, longitude: number): void {
+    this.latitude = latitude;
+    this.longitude = longitude;
+    console.log(`📍 BirdNET location updated to lat=${latitude}, lon=${longitude}`);
   }
 
   getThreshold(): number {

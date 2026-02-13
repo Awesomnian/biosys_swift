@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Platform } from 'react-native';
-import { useState, useEffect } from 'react';
-import { MapPin, Calendar, TrendingUp, Smartphone } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Platform, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { MapPin, Calendar, TrendingUp, Smartphone, Play, Pause } from 'lucide-react-native';
 import { supabase, Detection } from '../../lib/supabase';
+import { Audio } from 'expo-av';
 
 function WebOnlyMessage() {
   return (
@@ -23,9 +24,17 @@ function WebOnlyMessage() {
 function MobileDetectionsScreen() {
   const [detections, setDetections] = useState<Detection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     fetchDetections();
+    return () => {
+      // Cleanup sound on unmount
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
   }, []);
 
   const fetchDetections = async () => {
@@ -51,6 +60,39 @@ function MobileDetectionsScreen() {
     }
   };
 
+  const playAudio = async (url: string, detectionId: string) => {
+    try {
+      // Stop any currently playing audio
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      if (playingId === detectionId) {
+        setPlayingId(null);
+        return;
+      }
+
+      const { sound } = await Audio.Sound.createAsync({ uri: url });
+      soundRef.current = sound;
+      setPlayingId(detectionId);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingId(null);
+          sound.unloadAsync();
+          soundRef.current = null;
+        }
+      });
+
+      await sound.playAsync();
+    } catch (error) {
+      console.error('Playback failed:', error);
+      Alert.alert('Playback Error', 'Failed to play audio. The file may be unavailable.');
+      setPlayingId(null);
+    }
+  };
+
   const renderDetection = ({ item }: { item: Detection }) => (
     <View style={styles.detectionCard}>
       <View style={styles.detectionHeader}>
@@ -62,6 +104,15 @@ function MobileDetectionsScreen() {
         </View>
         <Text style={styles.modelName}>{item.model_name}</Text>
       </View>
+
+      {item.species_common_name && (
+        <View style={styles.speciesRow}>
+          <Text style={styles.speciesName}>{item.species_common_name}</Text>
+          {item.scientific_name && (
+            <Text style={styles.scientificName}> ({item.scientific_name})</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.detectionInfo}>
         <View style={styles.infoRow}>
@@ -84,10 +135,16 @@ function MobileDetectionsScreen() {
         <Text style={styles.deviceId}>{item.device_id}</Text>
         {item.audio_file_url && (
           <TouchableOpacity
-            onPress={() => {
-              console.log('Play audio:', item.audio_file_url);
-            }}>
-            <Text style={styles.playButton}>Play</Text>
+            style={styles.playButton}
+            onPress={() => playAudio(item.audio_file_url!, item.id!)}>
+            {playingId === item.id ? (
+              <Pause size={16} color="#10b981" />
+            ) : (
+              <Play size={16} color="#10b981" />
+            )}
+            <Text style={styles.playButtonText}>
+              {playingId === item.id ? 'Pause' : 'Play'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -188,6 +245,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  speciesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  speciesName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#10b981',
+  },
+  scientificName: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#9ca3af',
+  },
   detectionInfo: {
     marginBottom: 12,
   },
@@ -214,6 +286,14 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   playButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 8,
+    backgroundColor: '#10b98120',
+    borderRadius: 8,
+  },
+  playButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#10b981',

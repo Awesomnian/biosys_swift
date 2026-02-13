@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS detections (
   longitude numeric,
   model_name text NOT NULL,
   confidence numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  species_common_name TEXT,
+  scientific_name TEXT,
   audio_file_url text,
   uploaded_at timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now()

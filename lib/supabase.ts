@@ -29,6 +29,8 @@ export interface Detection {
   longitude?: number;
   model_name: string;
   confidence: number;
+  species_common_name?: string;
+  scientific_name?: string;
   audio_file_url?: string;
   uploaded_at?: string;
   created_at?: string;

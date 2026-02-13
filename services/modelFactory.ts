@@ -1,4 +1,5 @@
 import { BirdNETDetectionModel } from './detectionModelBirdNET';
+import { DetectionModel } from './detectionModel';
 
 export interface ModelFactoryConfig {
   threshold?: number;
@@ -7,7 +8,7 @@ export interface ModelFactoryConfig {
 }
 
 export class ModelFactory {
-  static async createModel(config: ModelFactoryConfig): Promise<BirdNETDetectionModel> {
+  static async createModel(config: ModelFactoryConfig): Promise<DetectionModel> {
     const threshold = config.threshold || 0.8;
 
     console.log('🔧 ModelFactory.createModel(): Creating BirdNET...');
@@ -35,7 +36,7 @@ export class ModelFactory {
     return model;
   }
 
-  static async autoDetectAndCreate(threshold: number = 0.8): Promise<BirdNETDetectionModel> {
+  static async autoDetectAndCreate(threshold: number = 0.8): Promise<DetectionModel> {
     console.log('🔧 ModelFactory.autoDetectAndCreate() START');
     console.log('  📊 Input threshold:', threshold);
 
@@ -46,7 +47,6 @@ export class ModelFactory {
       });
       console.log('  ✅ createModel() returned successfully');
       console.log('    - Model type:', typeof model);
-      console.log('    - Model has initialize:', typeof model?.initialize === 'function');
 
       console.log('✅ ModelFactory.autoDetectAndCreate() COMPLETE');
       console.log('  📦 Returning model to caller');
@@ -60,7 +60,7 @@ export class ModelFactory {
     }
   }
 
-  static async createBirdNETModel(threshold: number = 0.8): Promise<BirdNETDetectionModel> {
+  static async createBirdNETModel(threshold: number = 0.8): Promise<DetectionModel> {
     console.log('Creating BirdNET model');
     return await ModelFactory.createModel({
       threshold,

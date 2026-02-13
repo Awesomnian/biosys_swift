@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-  const birdnetUrl = "https://pruinose-alise-uncooled.ngrok-free.dev";
+  const birdnetUrl = Deno.env.get('BIRDNET_URL') || "https://pruinose-alise-uncooled.ngrok-free.dev";
   console.log(`Using BirdNET server at: ${birdnetUrl}`);
 
     if (req.method !== "POST") {
@@ -221,26 +221,44 @@ Deno.serve(async (req: Request) => {
       "swift",
     ];
 
+    const orangeBelliedParrotNames = [
+      "Neophema chrysogaster",
+      "Orange-bellied Parrot",
+      "orange-bellied",
+      "neophema chrysogaster",
+    ];
+
     const swiftParrotDetection = allDetections.find((detection) =>
       swiftParrotNames.some((name) =>
         detection.species_name.toLowerCase().includes(name.toLowerCase())
       )
     );
 
-    const threshold = 0.9;
-    const confidence = swiftParrotDetection?.probability || 
+    const orangeBelliedParrotDetection = allDetections.find((detection) =>
+      orangeBelliedParrotNames.some((name) =>
+        detection.species_name.toLowerCase().includes(name.toLowerCase())
+      )
+    );
+
+    const threshold = 0.8;
+    
+    // Check for either target species
+    const targetDetection = swiftParrotDetection || orangeBelliedParrotDetection;
+    const confidence = targetDetection?.probability || 
                       (allDetections.length > 0 ? allDetections[0].probability : 0);
-    const isPositive = swiftParrotDetection ? confidence >= threshold : false;
+    const isPositive = targetDetection ? confidence >= threshold : false;
 
     const response: AnalysisResponse = {
       confidence,
       isPositive,
       modelName: "BirdNET",
-      species: swiftParrotDetection?.species_name || allDetections[0]?.species_name,
+      species: targetDetection?.species_name || allDetections[0]?.species_name,
       allDetections: allDetections.slice(0, 10),
     };
 
-    console.log(`Analysis complete. Swift Parrot: ${isPositive ? 'YES' : 'NO'}, confidence: ${confidence.toFixed(3)}`);
+    const detectedSpecies = swiftParrotDetection ? 'Swift Parrot' : 
+                           orangeBelliedParrotDetection ? 'Orange-bellied Parrot' : 'None';
+    console.log(`Analysis complete. Detected: ${detectedSpecies}, Positive: ${isPositive ? 'YES' : 'NO'}, confidence: ${confidence.toFixed(3)}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,

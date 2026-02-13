@@ -3,7 +3,7 @@
  */
 
 import { AudioCaptureService, AudioSegment } from './audioCapture';
-import { DetectionResult } from './detectionModel';
+import { DetectionResult, DetectionModel } from './detectionModel';
 import { ModelFactory } from './modelFactory';
 import { StorageService } from './storageService';
 import { LocationService } from './locationService';
@@ -31,7 +31,7 @@ export interface SensorStats {
 
 export class SensorService {
   private audioCapture: AudioCaptureService;
-  private detectionModel: any = null;
+  private detectionModel: DetectionModel | null = null;
   private storageService: StorageService;
   private locationService: LocationService;
   private config: SensorConfig;
@@ -153,6 +153,14 @@ export class SensorService {
     }
 
     try {
+      // Update detection model with current location for BirdNET range filtering
+      const location = await this.locationService.getCurrentLocation();
+      if (location) {
+        this.detectionModel.setLocation(location.latitude, location.longitude);
+      } else if (this.config.latitude && this.config.longitude) {
+        this.detectionModel.setLocation(this.config.latitude, this.config.longitude);
+      }
+
       const result = await this.detectionModel.analyzeAudio(segment.uri);
 
       this.consecutiveErrors = 0;
@@ -184,6 +192,8 @@ export class SensorService {
       this.consecutiveErrors++;
       this.stats.consecutiveErrors = this.consecutiveErrors;
 
+      let deferredAnalysis = false;
+
       if (this.consecutiveErrors >= 5) {
         console.error('Too many consecutive errors, stopping monitoring');
         this.stop();
@@ -198,47 +208,47 @@ export class SensorService {
 
         if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to fetch')) {
           this.stats.lastError = 'BirdNET server unreachable. Check server configuration.';
-        } else {
-          // If BirdNET proxy returned a format error (e.g. 500 "Format not recognised."),
-          // preserve the audio and queue it for deferred server-side analysis via StorageService.
-          if (errorMessage.toLowerCase().includes('format not recognised') || errorMessage.toLowerCase().includes('format not recognized') || errorMessage.toLowerCase().includes('proxy returned status 500')) {
-            try {
-              console.warn('BirdNET format error detected — deferring analysis by saving audio for server-side processing');
-              const location = await this.locationService.getCurrentLocation();
-              const metadata = {
-                device_id: this.config.deviceId,
-                timestamp: new Date().toISOString(),
-                latitude: location?.latitude || this.config.latitude,
-                longitude: location?.longitude || this.config.longitude,
-                model_name: 'BirdNET-Deferred',
-                confidence: 0,
-              } as any;
-
-              await this.storageService.saveDetection(segment.uri, metadata);
-              this.stats.lastError = 'Analysis deferred to server due to audio format mismatch. Audio queued for upload.';
-              this.lastErrorTime = now;
-              this.updateStats();
-              return; // do not delete the file here — storageService will handle cleanup after upload
-            } catch (saveErr) {
-              console.error('Failed to defer analysis and save audio:', saveErr);
-              this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
-            }
-          } else {
+        } else if (
+          errorMessage.toLowerCase().includes('format not recognised') ||
+          errorMessage.toLowerCase().includes('format not recognized') ||
+          errorMessage.toLowerCase().includes('proxy returned status 500')
+        ) {
+          deferredAnalysis = true;
+          try {
+            console.warn('BirdNET format error — deferring analysis');
+            const location = await this.locationService.getCurrentLocation();
+            const metadata = {
+              device_id: this.config.deviceId,
+              timestamp: new Date().toISOString(),
+              latitude: location?.latitude || this.config.latitude,
+              longitude: location?.longitude || this.config.longitude,
+              model_name: 'BirdNET-Deferred',
+              confidence: 0,
+            } as any;
+            await this.storageService.saveDetection(segment.uri, metadata);
+            this.stats.lastError = 'Analysis deferred to server. Audio queued for upload.';
+          } catch (saveErr) {
+            console.error('Failed to defer analysis:', saveErr);
             this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
+            // Still don't delete — file may be recoverable
           }
+        } else {
+          this.stats.lastError = 'Analysis error: ' + errorMessage.substring(0, 100);
         }
 
         console.error('Error processing audio segment:', error);
         this.lastErrorTime = now;
         this.updateStats();
       }
-      
-      // Delete the audio segment unless we've already deferred it to storageService above.
-      try {
-        await FileSystem.deleteAsync(segment.uri, { idempotent: true });
-        console.log('\ud83d\uddd1\ufe0f Deleted temporary audio segment');
-      } catch (delErr) {
-        console.warn('Failed to delete temporary audio segment:', delErr);
+
+      // Only delete audio if we did NOT defer analysis
+      if (!deferredAnalysis) {
+        try {
+          await FileSystem.deleteAsync(segment.uri, { idempotent: true });
+          console.log('🗑️ Deleted temporary audio segment');
+        } catch (delErr) {
+          console.warn('Failed to delete temporary audio segment:', delErr);
+        }
       }
     }
   }
@@ -259,6 +269,8 @@ export class SensorService {
       longitude: location?.longitude || this.config.longitude,
       model_name: result.modelName,
       confidence: result.confidence,
+      species_common_name: result.commonName || result.species,
+      scientific_name: result.scientificName,
     };
 
     await this.storageService.saveDetection(segment.uri, metadata);

@@ -11,7 +11,10 @@ interface PendingDetection {
   id: string;
   audioUri: string;
   metadata: Omit<Detection, 'id' | 'audio_file_url'>;
+  retryCount?: number;
 }
+
+const MAX_RETRIES = 10;
 
 export class StorageService {
   private pendingQueue: PendingDetection[] = [];
@@ -69,12 +72,28 @@ export class StorageService {
     try {
       while (this.pendingQueue.length > 0) {
         const detection = this.pendingQueue[0];
-        await this.uploadDetection(detection);
-        this.pendingQueue.shift();
-        await this.persistQueue();
+        
+        // Check retry count
+        if ((detection.retryCount || 0) >= MAX_RETRIES) {
+          console.warn(`Detection ${detection.id} exceeded max retries (${MAX_RETRIES}), removing from queue`);
+          this.pendingQueue.shift();
+          await this.persistQueue();
+          continue;
+        }
+        
+        try {
+          await this.uploadDetection(detection);
+          // Only remove from queue after successful upload
+          this.pendingQueue.shift();
+          await this.persistQueue();
+        } catch (uploadError) {
+          console.error('Upload failed for detection, will retry later:', uploadError);
+          // Increment retry count
+          detection.retryCount = (detection.retryCount || 0) + 1;
+          await this.persistQueue();
+          break; // Stop processing queue, retry next time
+        }
       }
-    } catch (error) {
-      console.error('Upload failed:', error);
     } finally {
       this.isUploading = false;
     }
@@ -87,7 +106,7 @@ export class StorageService {
     const fileInfo = await FileSystem.getInfoAsync(detection.audioUri);
     if (!fileInfo.exists) {
       console.error('  ❌ File not found:', detection.audioUri);
-      return;
+      throw new Error(`File not found: ${detection.audioUri}`);
     }
     
     console.log('  📦 File size:', fileInfo.size, 'bytes');
@@ -96,8 +115,7 @@ export class StorageService {
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.error('  ❌ Supabase URL or ANON key missing. Cannot upload file now. Will retry later.');
-      // Leave detection in queue for retry
-      return;
+      throw new Error('Supabase URL or ANON key missing');
     }
 
     const uploadUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/detections/${fileName}`;

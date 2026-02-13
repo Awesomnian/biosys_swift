@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Switch, Platform, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Save, MapPin, FileSliders as Sliders, Smartphone } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 
 function WebOnlyMessage() {
   return (
@@ -66,18 +67,22 @@ function MobileSettingsScreen() {
   };
 
   const requestLocation = async () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude.toString());
-          setLongitude(position.coords.longitude.toString());
-        },
-        (error) => {
-          alert('Failed to get location: ' + error.message);
-        }
-      );
-    } else {
-      alert('Geolocation is not supported');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to get current location.');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      
+      setLatitude(location.coords.latitude.toString());
+      setLongitude(location.coords.longitude.toString());
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert('Location Error', 'Failed to get location: ' + errorMessage);
     }
   };
 
